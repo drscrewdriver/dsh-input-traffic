@@ -85,8 +85,11 @@ When editing a queued message (inline):
 ## Installation
 
 ```sh
-# Assemble (git or local path)
-dsh plugin --profile web add /absolute/path/to/dsh-input-traffic
+# Option 1: install from npm (recommended)
+dsh plugin --profile web add dsh-input-traffic
+
+# Option 2: assemble from git or a local path
+# dsh plugin --profile web add /absolute/path/to/dsh-input-traffic
 #    (after git install, build in the profile's node_modules: npm install --legacy-peer-deps && npm run build)
 
 # Confirm the composed tree contains the new row

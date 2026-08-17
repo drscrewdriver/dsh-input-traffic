@@ -85,8 +85,11 @@
 ## 安装
 
 ```sh
-# 组装（git 或本地路径）
-dsh plugin --profile web add /absolute/path/to/dsh-input-traffic
+# 方式一：从 npm 安装（推荐）
+dsh plugin --profile web add dsh-input-traffic
+
+# 方式二：git 或本地路径组装
+# dsh plugin --profile web add /absolute/path/to/dsh-input-traffic
 #    （git 安装后需在 profile 的 node_modules 内现场构建：npm install --legacy-peer-deps && npm run build）
 
 # 确认组合树包含新行
