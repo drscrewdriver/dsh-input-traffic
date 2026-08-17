@@ -1,0 +1,202 @@
+<p align="center">
+  <strong>Three-tier input traffic control for the DeepSeek Harness Web GUI</strong>
+</p>
+<p align="center">
+  <a href="README.md">中文</a> · <strong>English</strong>
+</p>
+<p align="center">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-263146?style=flat-square"></a>
+  <img alt="Public beta" src="https://img.shields.io/badge/status-public%20beta-7da1de?style=flat-square">
+</p>
+
+# dsh-input-traffic
+
+> While the agent is busy, "interrupt" and "queue" are no longer mutually exclusive: red interrupts and sends now, yellow inserts at the next turn, green queues until the end — all three coexist. Near DeepSeek peak pricing hours, one click freezes the session; resume later during off-peak pricing.
+
+A cordis client plugin assembled via the `dsh plugin` command and a bundle patch — no dsh source changes, no PR required.
+
+## What it does
+
+- **Three tiers coexist**: while the agent is busy, every input lands in a waiting area first, then you choose when it enters the conversation — no longer a single "interrupt" or a single "queue":
+  - 🔴 **Red (now)**: interrupt the current turn and send immediately — the running generation stops and the message is processed and answered right away;
+  - 🟡 **Yellow (next)**: insert at the next natural turn — the current action (tool call / ongoing generation) finishes first, no interruption;
+  - 🟢 **Green (later)**: queue until the whole logic has finished — processed after all previously queued actions complete (the default).
+- **Yellow is reversible**: pressing green on an already-steered (yellow) message revokes the insertion and pulls it back to the queue.
+- **Queued content stays editable**: messages already in the queue can be edited in place — the multi-line editor auto-grows with the content so long messages stay fully visible (Enter saves / Shift+Enter newline / Esc cancels); they can also be **pulled back into the composer for editing** (back-filled draft, then resubmitted).
+- **Queue management**: messages in the waiting area can be **moved up / down** to reorder, removed, or cleared with the queue-level "cancel and clear".
+- **Edits are never lost**: if saving an edit fails (the agent already claimed the message), the edited content automatically moves back to the composer; an occupied draft is never overwritten.
+- **Peak-hour freeze**: a "Freeze session" button on the composer's right — near DeepSeek peak pricing hours (09:00-12:00, 14:00-18:00) it pauses API consumption: the current turn finishes naturally, then the unsent queue is frozen; "Resume session" continues during off-peak hours.
+- **Official behavior takeover**: while the plugin is mounted, the official "busy-Enter behavior" settings row is hidden (Enter stays queue-later).
+
+## UI preview
+
+Layout sketch of the waiting area and the freeze button in a session page:
+
+```text
+┌─ Composer ───────────────────────────────────── Send ── [❄ Freeze] ─┐
+└─────────────────────────────────────────────────────────────────────┘
+┌─ Waiting area (three-tier planning dock) ───────────────────────────┐
+│ ┌ 2 queued messages                                 🗑 Cancel & clear ┐ │
+│ │ 🟢 queued   First message preview…       ↑ ↓ Pull  Edit  Remove   │ │
+│ │ 🟢 queued   Second message preview…      ↑ ↓ Pull  Edit  Remove   │ │
+│ │   Editing: the multi-line editor auto-grows (up to ~8 rows)       │ │
+│ │   Enter saves · Shift+Enter newline · Esc cancels                 │ │
+│ └───────────────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+## The three tiers
+
+| Tier | Color | Semantics | Underlying mechanism (existing dsh RPCs) |
+|---|---|---|---|
+| **later** (default) | Green | Queue: processed after all previously queued actions finish; green on an already-steered message **revokes the insertion** | Enter default queue → `agent.followup()` (next-turn); revoke = `updateQueue(remove)` + `send(text)` |
+| **next** | Yellow | Insert at the next natural turn: after the current action finishes | `updateQueue(id, { kind: 'steer' })` → `agent.steer()` (next-step boundary) |
+| **now** | Red | Interrupt and send: stop the current turn, the message is processed immediately | `cancel()` → `updateQueue(remove)` (avoids the inbox duplicate-insertion rejection) → `send(text)` (re-submit, wakes the driver immediately) |
+
+> Why red is cancel + remove + resend: the harness inbox rejects inserting a message that is already pending; steering the original message after an interrupt would be rejected and strand the message (see FAQ).
+
+## Session freeze / resume (peak-hour pause)
+
+The "Freeze session / Resume session" button on the composer's right (beside the send button) pauses API consumption near DeepSeek peak pricing hours:
+
+- **Freeze**: the current turn is **not interrupted** — it finishes naturally, then the unsent queue is frozen (detached from the waiting area); the dock shows a "Frozen" banner;
+- **Resume**: the frozen messages re-enter the queue and the agent continues in FIFO order;
+- Engine: freeze = detach every queued row via `updateQueue(remove)` (plain-text copies kept in the plugin store); the driver stops naturally once the current turn ends with no pending work; resume = re-submit via `send(text)`, waking the driver;
+- Note: queued messages containing non-text content (images) cannot be re-sent and are released by the freeze (they do not come back).
+
+## Queue management
+
+Each waiting-area message (while not frozen) offers:
+
+| Action | Description |
+|---|---|
+| Move up / down | Reorder the FIFO queue (the whole queue is rebuilt in the new order; disabled while any image message is queued) |
+| Edit in composer | Back-fill the message into the composer draft and remove it from the queue for editing |
+| Edit / remove | Edit the queued content in a multi-line editor / cancel the message |
+| Red / yellow / green planning | See "The three tiers" |
+| Cancel and clear | Stop the current run and remove every queued message |
+
+When editing a queued message (inline):
+
+- **Auto-grow**: the editor grows with the content in real time; long messages expand fully, up to about 8 rows, then scroll internally;
+- **Shortcuts**: `Enter` saves, `Shift+Enter` inserts a newline, `Esc` cancels (composition input is protected from accidental saves);
+- **Failure fallback**: if the save fails because the agent already claimed the message (e.g. "started sending"), the edited content automatically moves back to the composer with a notice — **nothing is lost**; the back-fill only happens when the composer is empty, so an existing draft is never overwritten.
+
+## Installation
+
+```sh
+# Assemble (git or local path)
+dsh plugin --profile web add /absolute/path/to/dsh-input-traffic
+#    (after git install, build in the profile's node_modules: npm install --legacy-peer-deps && npm run build)
+
+# Confirm the composed tree contains the new row
+dsh web --dump-config | grep -B1 -A2 'input-traffic'
+
+# Restart dsh web — required! A running instance does not hot-load the bundle layer
+dsh web
+```
+
+Local build and tests:
+
+```sh
+npm install --legacy-peer-deps   # the @deepseek-ai client package chain is incomplete on npm; toolchain only
+npm run build                    # tsc (lib/types) + tsdown (lib/index.js + lib/client.js)
+node examples/verify-assembly.mjs  # 12 assembly assertions
+npm test                         # 32 vitest component tests
+```
+
+## Usage
+
+1. While the agent is busy, type and send — the message enters the **waiting area** (green queue by default);
+2. Press a planning button on the message:
+   - 🟡 Yellow = interject — insert after the current action finishes;
+   - 🔴 Red = interrupt — stop the current action, the message is processed right away;
+   - 🟢 Green = keep queued (the default); on an already-steered message, green revokes it back to the queue;
+3. Reorder / re-edit: use move up/down, "Edit in composer", or the multi-line inline editor (Enter saves, Shift+Enter newline);
+4. Near peak hours: press "Freeze session" on the composer's right; the session pauses after the current turn; press "Resume session" during off-peak hours to continue.
+
+## FAQ
+
+### After an interrupt the message gets no reply / the conversation stalls
+
+Fixed (historical issue). Root cause: the harness inbox rejects inserting a message that is already pending — steering the original message right after an interrupt was rejected with `"message is already pending"`, stranding the message and stopping the driver. The current implementation is `cancel → remove → resend` (the text re-submitted as a fresh message), so the interrupted message is processed and answered immediately. If it still happens, rebuild the plugin and restart dsh web.
+
+### Where does the content go after a failed edit save?
+
+It is not lost. When the save fails (the agent already claimed the message), the edited content automatically moves back to the composer with an "Edit failed; the content was moved back to the composer" notice; if the composer already has a draft, nothing is back-filled and only the failure is reported.
+
+### The "busy-Enter behavior" settings row is missing
+
+Expected — the plugin hides it and pins Enter to green queue; a stale preference cannot leak behind the hidden row.
+
+### Queued messages disappeared after freezing
+
+Expected — the freeze detaches the queue into the plugin store (removed from the waiting area); they return on resume. Refreshing the page loses the frozen queue; avoid refreshing while frozen.
+
+### Move up/down is disabled
+
+Reordering is disabled while any queued message contains non-text content (images cannot be re-sent). Same for "Edit in composer".
+
+### Interrupt / interject buttons are disabled
+
+Red and yellow are disabled while the agent is idle — an idle agent would process the message immediately anyway, so planning is not needed.
+
+## Uninstall
+
+```sh
+dsh plugin --profile web remove dsh-input-traffic
+```
+
+Restart dsh web afterwards to restore the official queue dock and the "busy-Enter behavior" settings row.
+
+## Compatibility and privacy
+
+- Requires DeepSeek Harness with the web profile; verified on Windows/macOS/Linux dsh web.
+- A browser-side (client) plugin only — every operation goes through existing dsh RPCs (`session.prompt` / `session.updateQueue` / `session.cancel`); **no official source changes**.
+- The plugin reads no data beyond session state and uploads nothing; the frozen queue lives only in browser memory.
+- The contract types are declared locally in `src/types/contracts.d.ts` (the npm dsh client chain is incomplete) and mirror the harness sources at build-verification time.
+
+## Architecture
+
+```
+src/
+├── index.ts                  # node half (loader entry, empty apply)
+├── invariant.ts              # takeover invariants
+├── types/contracts.d.ts      # local @deepseek-ai/* contract declarations
+└── client/
+    ├── index.ts              # browser half apply: busyEnter pinned to queue + three slot registrations
+    ├── steer-queue-dock.tsx  # three-tier planning dock (shadows conversation.input.dock id queue)
+    ├── freeze-button.tsx     # freeze/resume button (conversation.input.right)
+    ├── freeze-store.ts       # shared freeze state (composer button ↔ dock banner)
+    ├── hide-enter-row.tsx    # settings-row hiding (shadows settings.general.item id composer-enter)
+    ├── locales.ts            # steer dictionaries (zh/en)
+    └── *.module.css
+```
+
+- **Slot shadowing**: list slots render the lowest priority per cell — the same id at priority -1 overrides the official entries (QueueDock, EnterBehaviorRow).
+- **Build chain**: tsdown mirrors harness `packages/client/tsdown.client.ts` semantics (`__ModuleLoader__.load` banner, lightningcss-inlined CSS Modules, platform externals table, bundle purity gate).
+- **Consumer contract**: `conversation.updateQueue / cancel / send / input.for(actx).notify / actions.setDraft` (official ui-conversation service, verified against api-proxy.ts).
+- **Auto-growing editor**: `resizeEditor` (a pure export of steer-queue-dock.tsx) resets the textarea height and grows it by `scrollHeight`; a CSS `max-height` caps the growth and the editor scrolls internally.
+
+## Real-environment verification (Windows, 2026-08-17)
+
+End-to-end browser verification on a live `dsh web`, zero application console errors:
+
+| Item | Result |
+|---|---|
+| Assembly | Composed tree contains the `input-traffic` row; plugin tab shows mounted/enabled; `/plugins/dsh-input-traffic/client.js` 200 |
+| Settings-row hiding | The "busy-Enter behavior" row is absent (zero DOM matches) |
+| Red now | Interrupted message is processed immediately: the agent replies to it explicitly and continues; no stranded intermediate state |
+| Yellow next + green revoke | After interjecting, green pulls the message back to the queue |
+| Freeze / resume | Current turn finishes naturally without interruption, queue frozen with banner; resume drains everything in FIFO order |
+| Queue editing (multi-line / fallback) | Covered by component tests (32/32 green); real-environment re-check pending |
+
+## References
+
+- [dsh-plugin-creation-convention.md](../dsh-plugin-creation-convention.md) (workspace root) — the dsh plugin creation convention this plugin follows
+- Semantics reference: [dsh-traffic-light](https://github.com/yimeng-dev/dsh-traffic-light) (desktop session-status traffic light)
+- Harness anchors: `packages/client/AGENTS.md`, `packages/client/tsdown.client.ts`, `packages/client/web/src/platform.ts`, `packages/bundle/web-app/cordis.patch.yml`, `packages/client/ui-conversation/src/client/queue/QueueDock.tsx`, `packages/host/apiproxy/src/api-proxy.ts`
+
+## License
+
+MIT

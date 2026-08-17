@@ -1,0 +1,11 @@
+# dsh-input-traffic bundle patch。
+#
+# 将本 client 插件作为一行追加进 profile 装配树。dsh-client-modules 的 node
+# half 扫描 Loader entries 中声明了 `dsh.client` 的包，把本包组合进
+# window.__DSH_BOOT__ 并服务 /plugins/dsh-input-traffic/client.js。
+#
+# 纯新增行，不替换任何官方行（插件行为经 slot shadowing 在浏览器侧接管，
+# 见 src/client/steer-queue-dock.tsx 与 hide-enter-row.tsx）。
+- insert:
+    - id: input-traffic
+      name: dsh-input-traffic

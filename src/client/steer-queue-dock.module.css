@@ -1,0 +1,303 @@
+/* Three-tier steering queue dock. Colors follow the red/yellow/green tier
+   vocabulary (radix-adjacent tones, matching the official web theme). */
+
+.dock {
+  width: 100%;
+}
+
+.panel {
+  background: var(--ds-color-surface, rgba(255, 255, 255, 0.8));
+  border: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.06));
+}
+
+.header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-text-secondary, #6b7280);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.header:disabled {
+  cursor: default;
+}
+
+.lead {
+  display: inline-flex;
+  color: var(--ds-color-text-tertiary, #9ca3af);
+}
+
+.count {
+  font-weight: 600;
+}
+
+.chevron {
+  display: inline-flex;
+  color: var(--ds-color-text-tertiary, #9ca3af);
+}
+
+.toolbarActions {
+  margin-left: auto;
+}
+
+.clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ds-color-text-secondary, #6b7280);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.freeze {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.12));
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ds-color-text-secondary, #6b7280);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.freeze[aria-pressed='true'] {
+  border-color: var(--ds-steer-green, #30a46c);
+  color: var(--ds-steer-green, #30a46c);
+}
+
+.freeze:hover:not(:disabled) {
+  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.freeze:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.frozenBanner {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.06));
+  background: color-mix(in srgb, var(--ds-steer-green, #30a46c) 8%, transparent);
+  color: var(--ds-steer-green, #30a46c);
+  font-size: 12px;
+}
+
+.clear:hover:not(:disabled) {
+  border-color: var(--ds-color-border, rgba(0, 0, 0, 0.12));
+  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.clear:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.clearLabel {
+  font-size: 12px;
+}
+
+.list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.row:hover {
+  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.03));
+}
+
+/* Editing rows grow with their content: the toolbar stays top-aligned. */
+.row[data-editing] {
+  align-items: flex-start;
+}
+
+.preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--ds-color-text, #1f2937);
+}
+
+/* Tier badge: colored dot + label projected from the row placement. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.badgeLabel {
+  color: inherit;
+}
+
+.badgeNow {
+  color: var(--ds-steer-red, #e5484d);
+  background: color-mix(in srgb, var(--ds-steer-red, #e5484d) 10%, transparent);
+}
+
+.badgeNext {
+  color: var(--ds-steer-yellow, #e8a33d);
+  background: color-mix(in srgb, var(--ds-steer-yellow, #e8a33d) 12%, transparent);
+}
+
+.badgeLater {
+  color: var(--ds-steer-green, #30a46c);
+  background: color-mix(in srgb, var(--ds-steer-green, #30a46c) 12%, transparent);
+}
+
+.badgeNow .dot {
+  background: var(--ds-steer-red, #e5484d);
+}
+
+.badgeNext .dot {
+  background: var(--ds-steer-yellow, #e8a33d);
+}
+
+.badgeLater .dot {
+  background: var(--ds-steer-green, #30a46c);
+}
+
+/* Read-only rows for messages already admitted into the running turn. */
+.steeringList {
+  margin: 0;
+  padding: 4px;
+  padding-top: 0;
+  list-style: none;
+}
+
+.steeringList .row {
+  opacity: 0.85;
+}
+
+.editor {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.15));
+  border-radius: 6px;
+  background: var(--ds-color-surface, #fff);
+  font-size: 13px;
+  line-height: 20px;
+  resize: none;
+  overflow-y: auto;
+  max-height: 160px;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ds-color-text-tertiary, #9ca3af);
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.05));
+  color: var(--ds-color-text, #1f2937);
+}
+
+.action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Three-tier planning group: one dot button per tier. */
+.plan {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.08));
+}
+
+.tier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tier:hover:not(:disabled) {
+  border-color: var(--ds-color-border, rgba(0, 0, 0, 0.2));
+}
+
+.tier:disabled {
+  cursor: default;
+}
+
+.tierLater {
+  border-color: var(--ds-steer-green, #30a46c);
+  background: color-mix(in srgb, var(--ds-steer-green, #30a46c) 12%, transparent);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.tierNow .dot {
+  background: var(--ds-steer-red, #e5484d);
+}
+
+.tierNext .dot {
+  background: var(--ds-steer-yellow, #e8a33d);
+}
+
+.tierLater .dot {
+  background: var(--ds-steer-green, #30a46c);
+}
