@@ -86,10 +86,11 @@
 
 ```sh
 # 方式一：从 npm 安装（推荐）
-dsh plugin --profile web add dsh-input-traffic
+#   （profile 是 pnpm workspace root，add 需带 -w 参数）
+dsh plugin --profile web add dsh-input-traffic -w
 
 # 方式二：git 或本地路径组装
-# dsh plugin --profile web add /absolute/path/to/dsh-input-traffic
+# dsh plugin --profile web add /absolute/path/to/dsh-input-traffic -w
 #    （git 安装后需在 profile 的 node_modules 内现场构建：npm install --legacy-peer-deps && npm run build）
 
 # 确认组合树包含新行

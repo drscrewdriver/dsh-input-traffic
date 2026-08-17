@@ -86,10 +86,11 @@ When editing a queued message (inline):
 
 ```sh
 # Option 1: install from npm (recommended)
-dsh plugin --profile web add dsh-input-traffic
+#   (the profile is a pnpm workspace root, so -w is required)
+dsh plugin --profile web add dsh-input-traffic -w
 
 # Option 2: assemble from git or a local path
-# dsh plugin --profile web add /absolute/path/to/dsh-input-traffic
+# dsh plugin --profile web add /absolute/path/to/dsh-input-traffic -w
 #    (after git install, build in the profile's node_modules: npm install --legacy-peer-deps && npm run build)
 
 # Confirm the composed tree contains the new row

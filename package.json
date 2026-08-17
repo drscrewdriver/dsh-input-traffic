@@ -1,6 +1,6 @@
 {
   "name": "dsh-input-traffic",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Three-tier (now/next/later) input steering for the DeepSeek Harness web GUI: replaces the busy-Enter queue dock with a red/yellow/green planning strip, hides the official busy-Enter behavior row, and keeps plain Enter as queue-later —a cordis client plugin, no dsh source changes, no PR required",
   "repository": {
