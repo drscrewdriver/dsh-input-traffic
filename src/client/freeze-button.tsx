@@ -22,14 +22,14 @@ export type FreezeButtonProps = PropsRuntime<'conversation.input.right'> & Steer
  * Freeze/resume toggle for the peak-hour scenario.
  * @param props - slot props; the session snapshot drives the detach list.
  */
-export function FreezeButton({ session, updateQueue, send, notify, t }: FreezeButtonProps) {
+export function FreezeButton({ session, updateQueue, cancel, send, notify, t }: FreezeButtonProps) {
   const { frozen } = useSyncExternalStore(freezeStore.subscribe, freezeStore.getSnapshot)
 
   const freeze = async (): Promise<void> => {
     const queued = session.queue.filter(row => row.placement === 'queued')
     // Preserve plain-text copies; non-text rows cannot be re-sent and are
     // released by the freeze (documented limitation).
-    const pending = queued.flatMap(row => row.text === null ? [] : [row.text])
+    const pending = queued.flatMap(row => row.text === null ? [] : [{ text: row.text, tier: 'queue' as const }])
     // Detach every queued row: the running turn finishes naturally, then the
     // driver finds no pending work and stops.
     await Promise.all(queued.map(row =>
@@ -42,9 +42,14 @@ export function FreezeButton({ session, updateQueue, send, notify, t }: FreezeBu
     const pending = freezeStore.getSnapshot().pending
     freezeStore.set({ frozen: false, pending: [] })
     try {
-      // Re-submit the preserved texts in FIFO order; the first send wakes the
-      // driver and the whole chain continues.
-      for (const text of pending) await send(text)
+      // Re-submit the preserved queue in FIFO order honoring each entry's
+      // planned insertion tier: a force (red) entry interrupts the current
+      // run first so it is consumed immediately; safe_point/later entries
+      // flow through the wake-and-continue chain.
+      for (const entry of pending) {
+        if (entry.tier === 'force') await cancel()
+        await send(entry.text)
+      }
     } catch {
       notify('error', t('steer.resumeFailed'))
     }

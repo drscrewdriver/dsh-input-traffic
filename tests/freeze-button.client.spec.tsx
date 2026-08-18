@@ -48,9 +48,28 @@ describe('FreezeButton', () => {
     })
     expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
     expect(updateQueue).toHaveBeenCalledWith('m2', { kind: 'remove' })
-    expect(freezeStore.getSnapshot()).toEqual({ frozen: true, pending: ['a', 'b'] })
+    expect(freezeStore.getSnapshot()).toEqual({
+      frozen: true,
+      pending: [{ text: 'a', tier: 'queue' }, { text: 'b', tier: 'queue' }],
+    })
     // Toggle becomes resume.
     expect(screen.getByRole('button', { name: 'steer.resume' })).toBeTruthy()
+  })
+
+  it('resume re-submits the preserved queue honoring the planned tiers', async () => {
+    const { cancel, send } = mount(snapshot([]))
+    // First entry planned as force: resume must interrupt before sending it.
+    await act(async () => {
+      freezeStore.set({ frozen: true, pending: [{ text: '急事', tier: 'force' }, { text: '排队', tier: 'queue' }] })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.resume' }))
+    })
+    expect(cancel).toHaveBeenCalled()
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send).toHaveBeenNthCalledWith(1, '急事')
+    expect(send).toHaveBeenNthCalledWith(2, '排队')
+    expect(freezeStore.getSnapshot()).toEqual({ frozen: false, pending: [] })
   })
 
   it('freeze does not cancel the running turn (it finishes naturally)', async () => {

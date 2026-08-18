@@ -70,6 +70,15 @@ describe('resizeEditor', () => {
 })
 
 describe('SteerQueueDock', () => {
+  beforeEach(() => {
+    // Reset the persisted collapse state so tests start from a known layout.
+    try {
+      localStorage.clear()
+    } catch {
+      /* jsdom may not expose storage */
+    }
+  })
+
   it('renders nothing for an empty queue while idle', () => {
     const { view } = mount(snapshot([], { running: false }))
     expect(view.container.firstChild).toBeNull()
@@ -306,8 +315,12 @@ describe('SteerQueueDock', () => {
 
   it('cancel and clear removes every queued row after cancelling', async () => {
     const { updateQueue, cancel } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
+    // Two-step confirmation: arm, then confirm.
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'steer.clear' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.clear.confirm' }))
     })
     expect(cancel).toHaveBeenCalled()
     expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
@@ -324,13 +337,16 @@ describe('SteerQueueDock', () => {
     expect(notify).not.toHaveBeenCalled()
   })
 
-  it('shows the frozen banner and disables planning while frozen', () => {
-    freezeStore.set({ frozen: true, pending: ['keep me'] })
+  it('shows the frozen banner while the detached queue stays interactive', () => {
+    freezeStore.set({ frozen: true, pending: [{ text: 'keep me', tier: 'queue' }] })
     try {
-      mount(snapshot([queueRow('m1', 'keep me')]))
+      mount(snapshot([]))
       expect(screen.getByText('steer.frozen')).toBeTruthy()
-      expect(screen.getByRole('button', { name: 'steer.now' }).hasAttribute('disabled')).toBe(true)
-      expect(screen.getByRole('button', { name: 'steer.next' }).hasAttribute('disabled')).toBe(true)
+      // The detached queue's tier planning stays interactive while frozen.
+      const nowBtn = screen.getByRole('button', { name: 'steer.now' })
+      expect(nowBtn.hasAttribute('disabled')).toBe(false)
+      fireEvent.click(nowBtn)
+      expect(freezeStore.getSnapshot().pending[0]?.tier).toBe('force')
     } finally {
       resetFreezeStore()
     }
@@ -360,5 +376,180 @@ describe('SteerQueueDockInjected shape', () => {
     expect(typeof face.send).toBe('function')
     expect(typeof face.setDraft).toBe('function')
     expect(typeof face.notify).toBe('function')
+  })
+})
+
+/**
+ * dsh-queue-plus-inspired queue-editing behaviors: drag-to-reorder,
+ * reorder concurrency protection (reject instead of scrambling), collapse
+ * state persistence, and a two-step clear confirmation.
+ */
+describe('queue editing (dsh-queue-plus inspired)', () => {
+  beforeEach(() => {
+    try {
+      localStorage.clear()
+    } catch {
+      /* jsdom may not expose storage */
+    }
+    resetFreezeStore()
+  })
+
+  it('frozen session keeps the waiting area visible with the detached queue editable', () => {
+    freezeStore.set({ frozen: true, pending: [{ text: '排队一', tier: 'queue' }, { text: '排队二', tier: 'safe_point' }] })
+    // After freeze the dsh queue is empty and the agent is idle, but the dock
+    // must stay mounted and render the detached queue from the freeze store.
+    const { view } = mount(snapshot([], { running: false }))
+    expect(view.container.firstChild).not.toBeNull()
+    const list = view.container.querySelector('[data-testid="frozen-list"]')
+    expect(list).toBeTruthy()
+    expect(list?.textContent).toContain('排队一')
+    expect(list?.textContent).toContain('排队二')
+    expect(list?.textContent).toContain('steer.frozenBadge')
+    // Freezing pauses the run only: the detached queue stays fully editable,
+    // including the planned insertion tier (red/yellow/green).
+    expect(screen.getAllByRole('button', { name: 'steer.moveUp' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: 'queue.remove' }).length).toBe(2)
+    expect(screen.getAllByRole('button', { name: 'queue.edit' }).length).toBe(2)
+    expect(screen.getAllByRole('button', { name: 'steer.now' }).length).toBe(2)
+    expect(screen.getAllByRole('button', { name: 'steer.next' }).length).toBe(2)
+    expect(screen.getAllByRole('button', { name: 'steer.later' }).length).toBe(2)
+  })
+
+  it('frozen queue rows can be reordered and removed', () => {
+    freezeStore.set({ frozen: true, pending: [{ text: '甲', tier: 'queue' }, { text: '乙', tier: 'queue' }, { text: '丙', tier: 'queue' }] })
+    mount(snapshot([], { running: false }))
+    // Move the last row (丙) up once: 甲, 丙, 乙.
+    fireEvent.click(screen.getAllByRole('button', { name: 'steer.moveUp' })[2] as Element)
+    expect(freezeStore.getSnapshot().pending.map(e => e.text)).toEqual(['甲', '丙', '乙'])
+    // Remove 丙: 甲, 乙.
+    fireEvent.click(screen.getAllByRole('button', { name: 'queue.remove' })[1] as Element)
+    expect(freezeStore.getSnapshot().pending.map(e => e.text)).toEqual(['甲', '乙'])
+  })
+
+  it('frozen queue rows can be edited in place', () => {
+    freezeStore.set({ frozen: true, pending: [{ text: '原文', tier: 'queue' }] })
+    mount(snapshot([], { running: false }))
+    fireEvent.click(screen.getByRole('button', { name: 'queue.edit' }))
+    const editor = screen.getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(editor, { target: { value: '改后' } })
+    fireEvent.click(screen.getByRole('button', { name: 'queue.save' }))
+    expect(freezeStore.getSnapshot().pending).toEqual([{ text: '改后', tier: 'queue' }])
+  })
+
+  it('frozen queue rows can change the planned insertion tier (red/yellow/green)', () => {
+    freezeStore.set({ frozen: true, pending: [{ text: '待规划', tier: 'queue' }] })
+    mount(snapshot([], { running: false }))
+    // Red: force interrupt on resume.
+    fireEvent.click(screen.getByRole('button', { name: 'steer.now' }))
+    expect(freezeStore.getSnapshot().pending[0]?.tier).toBe('force')
+    // Yellow: safe_point.
+    fireEvent.click(screen.getByRole('button', { name: 'steer.next' }))
+    expect(freezeStore.getSnapshot().pending[0]?.tier).toBe('safe_point')
+    // Green: queue (default).
+    fireEvent.click(screen.getByRole('button', { name: 'steer.later' }))
+    expect(freezeStore.getSnapshot().pending[0]?.tier).toBe('queue')
+  })
+
+  it('frozen queue rows support drag-to-reorder like the live queue', () => {
+    freezeStore.set({ frozen: true, pending: [{ text: '甲', tier: 'queue' }, { text: '乙', tier: 'queue' }, { text: '丙', tier: 'queue' }] })
+    const { view } = mount(snapshot([], { running: false }))
+    const items = view.container.querySelectorAll('[data-testid="frozen-list"] li')
+    expect(items).toHaveLength(3)
+    const dataTransfer = { effectAllowed: '', setData: vi.fn(), getData: vi.fn() }
+    // Drag the third row (丙) onto the first row (甲).
+    fireEvent.dragStart(items[2] as Element, { dataTransfer })
+    fireEvent.dragOver(items[0] as Element, { dataTransfer, preventDefault: vi.fn() })
+    fireEvent.drop(items[0] as Element, { dataTransfer, preventDefault: vi.fn() })
+    expect(freezeStore.getSnapshot().pending.map(e => e.text)).toEqual(['丙', '甲', '乙'])
+  })
+
+  it('clear requires a second confirm click before executing', async () => {
+    const { updateQueue, cancel } = mount(snapshot([queueRow('m1', 'a')]))
+    // First click arms the confirmation state; nothing is cancelled yet.
+    fireEvent.click(screen.getByRole('button', { name: 'steer.clear' }))
+    expect(cancel).not.toHaveBeenCalled()
+    // The button now reads as a confirm prompt.
+    expect(screen.getByRole('button', { name: 'steer.clear.confirm' })).toBeTruthy()
+    // Second click executes the clear.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.clear.confirm' }))
+    })
+    expect(cancel).toHaveBeenCalled()
+    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
+  })
+
+  it('the armed clear can be aborted with the explicit cancel button', async () => {
+    const { updateQueue, cancel } = mount(snapshot([queueRow('m1', 'a')]))
+    fireEvent.click(screen.getByRole('button', { name: 'steer.clear' }))
+    expect(screen.getByRole('button', { name: 'steer.clear.cancel' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'steer.clear.cancel' }))
+    // Back to the idle prompt; nothing was cancelled or removed.
+    expect(screen.queryByRole('button', { name: 'steer.clear.confirm' })).toBeNull()
+    expect(cancel).not.toHaveBeenCalled()
+    expect(updateQueue).not.toHaveBeenCalled()
+  })
+
+  it('drag-and-drop reorders the queue (remove all, resend in the new order)', async () => {
+    const rows = [
+      queueRow('m1', 'a'),
+      queueRow('m2', 'b'),
+      queueRow('m3', 'c'),
+    ]
+    const { view, updateQueue, send } = mount(snapshot(rows))
+    // Expand the collapsed list.
+    const header = view.container.querySelector('button[aria-controls]')
+    expect(header).toBeTruthy()
+    await act(async () => { fireEvent.click(header as Element) })
+
+    const items = view.container.querySelectorAll('li')
+    expect(items).toHaveLength(3)
+    const dataTransfer = { effectAllowed: '', setData: vi.fn(), getData: vi.fn() }
+    // Drag the third row (c) onto the first row (a).
+    fireEvent.dragStart(items[2] as Element, { dataTransfer })
+    fireEvent.dragOver(items[0] as Element, { dataTransfer, preventDefault: vi.fn() })
+    fireEvent.drop(items[0] as Element, { dataTransfer, preventDefault: vi.fn() })
+    await act(async () => { await Promise.resolve() })
+
+    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
+    expect(updateQueue).toHaveBeenCalledWith('m2', { kind: 'remove' })
+    expect(updateQueue).toHaveBeenCalledWith('m3', { kind: 'remove' })
+    expect(send).toHaveBeenCalledTimes(3)
+    expect(send).toHaveBeenNthCalledWith(1, 'c')
+    expect(send).toHaveBeenNthCalledWith(2, 'a')
+    expect(send).toHaveBeenNthCalledWith(3, 'b')
+  })
+
+  it('rejects the reorder when the queue changed mid-flight instead of scrambling', async () => {
+    const { view, updateQueue, send, notify } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
+    // The agent claims the first row while the reorder removes it.
+    updateQueue.mockRejectedValueOnce(new Error('queue-item-not-found'))
+    // Expand the collapsed list so the row actions are visible.
+    const header = view.container.querySelector('button[aria-controls]')
+    expect(header).toBeTruthy()
+    await act(async () => { fireEvent.click(header as Element) })
+    // Use the move-down button to trigger a reorder.
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'steer.moveDown' })[0] as Element)
+    })
+    // The rebuild must stop: no re-send, and a stale-queue notice instead.
+    expect(send).not.toHaveBeenCalled()
+    expect(notify).toHaveBeenCalledWith('error', 'steer.reorderStale')
+  })
+
+  it('remembers the manual collapse state across mounts', () => {
+    // Persisted as expanded.
+    try {
+      localStorage.setItem('dsh-input-traffic:collapsed', '0')
+    } catch {
+      /* ignore */
+    }
+    const { view } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
+    // With persisted expanded state the list is visible without a click.
+    expect(view.container.querySelector('ul[hidden]')).toBeNull()
+    // Toggling the header persists the collapsed state.
+    const header = view.container.querySelector('button[aria-controls]')
+    expect(header).toBeTruthy()
+    fireEvent.click(header as Element)
+    expect(localStorage.getItem('dsh-input-traffic:collapsed')).toBe('1')
   })
 })

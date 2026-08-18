@@ -33,7 +33,7 @@ import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronUpOutline14, IconCloseOutline16,
   IconEditOutline16, IconQueueOutline14, IconRightUpOutline16, IconTrashOutline16, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { freezeStore } from './freeze-store.ts'
+import { freezeStore, setTierAt, updatePendingAt, removePendingAt, movePending } from './freeze-store.ts'
 import css from './steer-queue-dock.module.css'
 
 /** One mutation accepted by the conversation queue verb. */
@@ -44,6 +44,9 @@ export type SteerQueueAction =
 
 /** Busy marker for a whole-queue rebuild (reorder); locks every row action. */
 const REORDER_MARK = '__reorder__'
+
+/** localStorage key for the manual collapse state (dsh-queue-plus parity). */
+const COLLAPSE_KEY = 'dsh-input-traffic:collapsed'
 
 /** Queue operations injected by the session-scoped registration. */
 export interface SteerQueueDockInjected {
@@ -112,29 +115,63 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
-  const [collapsed, setCollapsed] = useState(true)
+  // Two-step clear confirmation: the first click arms the prompt, the second
+  // executes; arming auto-reverts after a few seconds (no native confirm).
+  const [confirmClear, setConfirmClear] = useState(false)
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Drag-and-drop reorder source index and the current drop-target row.
+  const dragIndex = useRef<number | null>(null)
+  const [dragOver, setDragOver] = useState<number | null>(null)
+  // Collapse state persists across mounts (dsh-queue-plus parity).
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      const v = localStorage.getItem(COLLAPSE_KEY)
+      return v === null ? true : v === '1'
+    } catch {
+      return true
+    }
+  })
   // Session-level freeze lives in the composer-right control; the dock reads
-  // the shared store for the banner and inert states.
-  const { frozen } = useSyncExternalStore(freezeStore.subscribe, freezeStore.getSnapshot)
+  // the shared store for the banner and inert states. While frozen the
+  // detached queue is rendered here (read-only) so the waiting area stays
+  // visible — freezing only pauses the running behavior, it must not hide
+  // the queued messages.
+  const { frozen, pending: frozenPending } = useSyncExternalStore(freezeStore.subscribe, freezeStore.getSnapshot)
   const listId = useId()
   // The edit textarea; grown to its content on entry and on every input.
   const editorRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (queue.length === 0 && !collapsed) setCollapsed(true)
-    if (editing !== null && (!queueMutable || !queue.some(row => row.id === editing.id))) setEditing(null)
+    // Frozen-row edits use a `frozen:` id that never exists in the dsh queue;
+    // skip the stale-check for them so the detached queue stays editable.
+    if (editing !== null && !editing.id.startsWith('frozen:') && (!queueMutable || !queue.some(row => row.id === editing.id))) setEditing(null)
   }, [collapsed, editing, queue, queueMutable])
 
-  // Grow the editor to its full content when a row enters edit mode.
+  // Persist the manual collapse state; clear the confirm timer on unmount.
   useEffect(() => {
-    if (editing === null) return
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0')
+    } catch {
+      /* storage unavailable: in-memory only */
+    }
+  }, [collapsed])
+  useEffect(() => () => {
+    if (confirmTimer.current !== null) clearTimeout(confirmTimer.current)
+  }, [])
+
+  // Grow the editor to its full content when a row enters edit mode.
+  const editingId = editing?.id
+  useEffect(() => {
+    if (editingId === undefined) return
     const el = editorRef.current
     if (el !== null) resizeEditor(el)
-  }, [editing?.id])
+  }, [editingId])
 
   // The dock stays mounted while the agent runs (the freeze entry must be
-  // reachable before any message queues), and while any row is pending.
-  if (queue.length === 0 && steering.length === 0 && !running) return null
+  // reachable before any message queues), while any row is pending, and while
+  // the session is frozen (the detached queue stays visible).
+  if (queue.length === 0 && steering.length === 0 && !running && !frozen) return null
 
   const interactionActive = queueMutable && (editing !== null || busy !== null || clearing)
   const expanded = !collapsed || interactionActive
@@ -233,10 +270,39 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
   }
 
   /**
-   * Move one queued row up/down in the FIFO order. The queue is rebuilt in
-   * the new order: every queued row is removed and re-sent sequentially
-   * (plain-text rows only), so the agent's next-turn list matches the
-   * reordered view.
+   * Rebuild the queue in a new order: remove every queued row, then re-send
+   * the texts sequentially so the agent's next-turn list matches the new
+   * order. Concurrency protection (dsh-queue-plus parity): if a remove fails
+   * with queue-item-not-found, the agent already claimed that row — the
+   * rebuild stops immediately and nothing is re-sent, so the changed queue
+   * is never scrambled.
+   */
+  const rebuildQueue = async (rows: readonly { id: string; text: string | null }[], next: readonly { id: string; text: string | null }[]): Promise<void> => {
+    setBusy(REORDER_MARK)
+    try {
+      for (const row of rows) {
+        try {
+          await updateQueue(row.id, { kind: 'remove' })
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('queue-item-not-found')) {
+            notify('error', t('steer.reorderStale'))
+            return
+          }
+          throw error
+        }
+      }
+      for (const row of next) {
+        if (row.text !== null) await send(row.text)
+      }
+    } catch {
+      notify('error', t('steer.reorderFailed'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /**
+   * Move one queued row up/down in the FIFO order (arrow buttons).
    */
   const reorder = async (rowId: string, delta: -1 | 1): Promise<void> => {
     const rows = queue
@@ -251,15 +317,56 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
       notify('error', t('steer.reorder.unsupported'))
       return
     }
-    setBusy(REORDER_MARK)
-    try {
-      for (const row of rows) await updateQueue(row.id, { kind: 'remove' })
-      for (const row of next) await send(row.text as string)
-    } catch {
-      notify('error', t('steer.reorderFailed'))
-    } finally {
-      setBusy(null)
+    await rebuildQueue(rows, next)
+  }
+
+  /**
+   * Move one row to an absolute position (drag-and-drop drop handler).
+   */
+  const reorderTo = async (fromIndex: number, toIndex: number): Promise<void> => {
+    if (fromIndex === toIndex) return
+    const rows = queue
+    if (rows[fromIndex] === undefined || rows[toIndex] === undefined) return
+    const next = [...rows]
+    const [moved] = next.splice(fromIndex, 1)
+    if (moved === undefined) return
+    next.splice(toIndex, 0, moved)
+    if (next.some(row => row.text === null)) {
+      notify('error', t('steer.reorder.unsupported'))
+      return
     }
+    await rebuildQueue(rows, next)
+  }
+
+  /** Arm or execute the two-step clear confirmation. */
+  const armClear = (): void => {
+    if (confirmClear) {
+      if (confirmTimer.current !== null) clearTimeout(confirmTimer.current)
+      setConfirmClear(false)
+      void clearAll()
+      return
+    }
+    setConfirmClear(true)
+    if (confirmTimer.current !== null) clearTimeout(confirmTimer.current)
+    confirmTimer.current = setTimeout(() => setConfirmClear(false), 3000)
+  }
+
+  /** Abort the armed clear confirmation (the explicit cancel button). */
+  const cancelClear = (): void => {
+    if (confirmTimer.current !== null) clearTimeout(confirmTimer.current)
+    setConfirmClear(false)
+  }
+
+  /** Save an in-place edit of one detached (frozen) queued message. */
+  const saveFrozenEdit = async (index: number): Promise<void> => {
+    if (editing === null) return
+    const text = editing.text.trim()
+    if (text === '') {
+      setEditing(null)
+      return
+    }
+    updatePendingAt(index, text)
+    setEditing(null)
   }
 
   /**
@@ -321,16 +428,27 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
             )}
           </button>
           <div className={css.toolbarActions}>
-            <Tooltip label={t('steer.clear')} side="top" delayMs={500}>
+            {confirmClear && (
               <button
                 type="button"
-                className={css.clear}
-                aria-label={t('steer.clear')}
+                className={css.clearCancel}
+                aria-label={t('steer.clear.cancel')}
                 disabled={clearing || busy !== null || nothingPending}
-                onClick={() => { void clearAll() }}
+                onClick={cancelClear}
+              >
+                <span className={css.clearLabel}>{t('steer.clear.cancel')}</span>
+              </button>
+            )}
+            <Tooltip label={confirmClear ? t('steer.clear.confirm') : t('steer.clear')} side="top" delayMs={500}>
+              <button
+                type="button"
+                className={`${css.clear} ${confirmClear ? css.clearConfirm : ''}`}
+                aria-label={confirmClear ? t('steer.clear.confirm') : t('steer.clear')}
+                disabled={clearing || busy !== null || nothingPending}
+                onClick={armClear}
               >
                 <IconTrashOutline16 size={14} />
-                <span className={css.clearLabel}>{t('steer.clear')}</span>
+                <span className={css.clearLabel}>{confirmClear ? t('steer.clear.confirm') : t('steer.clear')}</span>
               </button>
             </Tooltip>
           </div>
@@ -340,9 +458,220 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
             {t('steer.frozen')}
           </div>
         )}
+        {/* While frozen the queue is detached into the shared store: render it
+            here so the waiting area never disappears. The detached rows stay
+            fully editable (edit / remove / reorder) — freezing only pauses
+            the running behavior, it must not lock the queue. */}
+        {frozen && frozenPending.length > 0 && (
+          <ul className={css.frozenList} data-testid="frozen-list">
+            {frozenPending.map((entry, i) => {
+              const editingFrozen = editing?.id === `frozen:${i}`
+              const text = entry.text
+              return (
+                <li
+                  key={i}
+                  className={`${css.frozenRow} ${dragOver === i && frozen ? css.rowDragOver : ''}`}
+                  data-tier={entry.tier === 'force' ? 'now' : entry.tier === 'safe_point' ? 'next' : 'later'}
+                  data-editing={editingFrozen ? '' : undefined}
+                  draggable={!editingFrozen}
+                  title={!editingFrozen ? t('steer.dragReorder') : undefined}
+                  onDragStart={(event) => {
+                    if (editingFrozen) return
+                    dragIndex.current = i
+                    event.dataTransfer.effectAllowed = 'move'
+                    // Some engines only start HTML5 drag once data is set.
+                    event.dataTransfer.setData('text/plain', String(i))
+                  }}
+                  onDragOver={(event) => {
+                    if (dragIndex.current === null) return
+                    event.preventDefault()
+                    setDragOver(i)
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    const from = dragIndex.current
+                    dragIndex.current = null
+                    setDragOver(null)
+                    if (from !== null) movePending(from, i)
+                  }}
+                  onDragEnd={() => {
+                    dragIndex.current = null
+                    setDragOver(null)
+                  }}
+                >
+                  <span className={css.lead} aria-hidden><IconQueueOutline14 /></span>
+                  <SteerBadge tier={entry.tier === 'force' ? 'now' : entry.tier === 'safe_point' ? 'next' : 'later'} t={t} />
+                  {editingFrozen
+                    ? (
+                      <textarea
+                        ref={editorRef}
+                        autoFocus
+                        className={css.editor}
+                        aria-label={t('queue.edit')}
+                        rows={1}
+                        value={editing?.text ?? text}
+                        onChange={(event) => { setEditing({ id: `frozen:${i}`, text: event.currentTarget.value }) }}
+                        onInput={(event) => { resizeEditor(event.currentTarget) }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Escape') {
+                            setEditing(null)
+                            return
+                          }
+                          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                            event.preventDefault()
+                            void saveFrozenEdit(i)
+                          }
+                        }}
+                      />
+                    )
+                    : <span className={css.preview}>{text}</span>}
+                  <div className={css.actions}>
+                    {editingFrozen ? (
+                      <>
+                        <Tooltip label={t('queue.save')} side="bottom" delayMs={500}>
+                          <button
+                            type="button"
+                            className={css.action}
+                            aria-label={t('queue.save')}
+                            disabled={editing === null || editing.text.trim() === ''}
+                            onClick={() => { void saveFrozenEdit(i) }}
+                          >
+                            <IconCheckOutline16 size={14} />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label={t('queue.cancelEdit')} side="bottom" delayMs={500}>
+                          <button
+                            type="button"
+                            className={css.action}
+                            aria-label={t('queue.cancelEdit')}
+                            onClick={() => { setEditing(null) }}
+                          >
+                            <IconCloseOutline16 size={14} />
+                          </button>
+                        </Tooltip>
+                      </>
+                    ) : (
+                      <>
+                        <Tooltip label={t('steer.moveUp')} side="bottom" delayMs={500} disabled={i === 0}>
+                          <button
+                            type="button"
+                            className={css.action}
+                            aria-label={t('steer.moveUp')}
+                            disabled={i === 0}
+                            onClick={() => movePending(i, i - 1)}
+                          >
+                            <IconChevronUpOutline14 />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label={t('steer.moveDown')} side="bottom" delayMs={500} disabled={i === frozenPending.length - 1}>
+                          <button
+                            type="button"
+                            className={css.action}
+                            aria-label={t('steer.moveDown')}
+                            disabled={i === frozenPending.length - 1}
+                            onClick={() => movePending(i, i + 1)}
+                          >
+                            <IconChevronDownOutline14 />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label={t('queue.edit')} side="bottom" delayMs={500}>
+                          <button
+                            type="button"
+                            className={css.action}
+                            aria-label={t('queue.edit')}
+                            onClick={() => { setEditing({ id: `frozen:${i}`, text }) }}
+                          >
+                            <IconEditOutline16 size={14} />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label={t('queue.remove')} side="bottom" delayMs={500}>
+                          <button
+                            type="button"
+                            className={css.action}
+                            aria-label={t('queue.remove')}
+                            onClick={() => removePendingAt(i)}
+                          >
+                            <IconTrashOutline16 size={14} />
+                          </button>
+                        </Tooltip>
+                        {/* Planned insertion tier: freezing pauses consumption,
+                            it must not lock the tier planning of each row. */}
+                        <span className={css.plan} role="group" aria-label={t('steer.later.aria')}>
+                          <Tooltip label={t('steer.now')} side="bottom" delayMs={500}>
+                            <button
+                              type="button"
+                              className={`${css.tier} ${css.tierNow}`}
+                              aria-label={t('steer.now')}
+                              aria-pressed={entry.tier === 'force' || undefined}
+                              onClick={() => setTierAt(i, 'force')}
+                            >
+                              <span className={css.dot} aria-hidden />
+                            </button>
+                          </Tooltip>
+                          <Tooltip label={t('steer.next')} side="bottom" delayMs={500}>
+                            <button
+                              type="button"
+                              className={`${css.tier} ${css.tierNext}`}
+                              aria-label={t('steer.next')}
+                              aria-pressed={entry.tier === 'safe_point' || undefined}
+                              onClick={() => setTierAt(i, 'safe_point')}
+                            >
+                              <span className={css.dot} aria-hidden />
+                            </button>
+                          </Tooltip>
+                          <Tooltip label={t('steer.later')} side="bottom" delayMs={500}>
+                            <button
+                              type="button"
+                              className={`${css.tier} ${css.tierLater}`}
+                              aria-label={t('steer.later')}
+                              aria-pressed={entry.tier === 'queue' || undefined}
+                              onClick={() => setTierAt(i, 'queue')}
+                            >
+                              <span className={css.dot} aria-hidden />
+                            </button>
+                          </Tooltip>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <span className={css.frozenMark}>{t('steer.frozenBadge')}</span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
         <ul id={listId} className={css.list} hidden={!listVisible}>
-          {listVisible && queue.map(row => (
-            <li key={row.id} className={css.row} data-tier={badgeFor('queued') ?? undefined} data-editing={editing?.id === row.id ? '' : undefined}>
+          {listVisible && queue.map((row, index) => (
+            <li
+              key={row.id}
+              className={`${css.row} ${dragOver === index ? css.rowDragOver : ''}`}
+              data-tier={badgeFor('queued') ?? undefined}
+              data-editing={editing?.id === row.id ? '' : undefined}
+              draggable={queueMutable && !reorderUnsupported && busy === null && !frozen}
+              title={queueMutable && !reorderUnsupported && busy === null && !frozen ? t('steer.dragReorder') : undefined}
+              onDragStart={(event) => {
+                dragIndex.current = index
+                event.dataTransfer.effectAllowed = 'move'
+                // Some engines only start HTML5 drag once data is set.
+                event.dataTransfer.setData('text/plain', String(index))
+              }}
+              onDragOver={(event) => {
+                if (dragIndex.current === null) return
+                event.preventDefault()
+                setDragOver(index)
+              }}
+              onDrop={(event) => {
+                event.preventDefault()
+                const from = dragIndex.current
+                dragIndex.current = null
+                setDragOver(null)
+                if (from !== null) void reorderTo(from, index)
+              }}
+              onDragEnd={() => {
+                dragIndex.current = null
+                setDragOver(null)
+              }}
+            >
               {queue.length === 1 && <span className={css.lead} aria-hidden><IconQueueOutline14 /></span>}
               <SteerBadge tier={badgeFor('queued')} t={t} />
               {editing?.id === row.id

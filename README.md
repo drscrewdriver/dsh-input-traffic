@@ -59,9 +59,9 @@
 
 输入框右侧（发送按钮旁）的「冻结会话 / 恢复会话」按钮，用于即将进入 DeepSeek 高峰收费时段时暂停 API 消耗：
 
-- **冻结**：当前轮次**不打断**、自然完成后暂停；未发送队列被冻结保存（从等待区移除）；等待区显示「已冻结」横幅；
-- **恢复**：冻结的排队消息重新入队，agent 按 FIFO 继续处理；
-- 引擎实现：冻结 = 逐条 `updateQueue(remove)` 分离队列（纯文本副本存于插件 store），当前轮次完成后 driver 因无 pending 自然停止；恢复 = 逐条 `send(text)` 重新提交并唤醒 driver；
+- **冻结**：当前轮次**不打断**、自然完成后暂停；**队列与冻结解耦**——冻结只停止 agent 消费（执行/插入/追加），等待队列保持可见且**完全可操作**（排序、编辑、删除、设定红/黄/绿插入档位），与未冻结无明显区别；
+- **恢复**：按修改后的队列重新入队，**按每条预定的档位执行**（红=打断并立即处理，黄=插话，绿=排队），agent 按 FIFO 继续处理；
+- 引擎实现：冻结 = 逐条 `updateQueue(remove)` 分离队列（含档位的副本存于插件 store），当前轮次完成后 driver 因无 pending 自然停止；冻结期间对队列的修改（文本/顺序/档位）实时写回 store；恢复 = 逐条 `send(text)` 重新提交并唤醒 driver（红色档位的条目先 `cancel()` 再发送）；
 - 注意：含非文本内容（图片）的排队消息无法重发，冻结时会随队列释放（不会恢复）。
 
 ## 队列管理
@@ -71,10 +71,15 @@
 | 操作 | 说明 |
 |---|---|
 | 上移 / 下移 | 调整 FIFO 顺序（整个队列按新顺序重建；含图片消息时禁用） |
+| **拖拽排序** | 按住行直接拖动到目标位置（原生 HTML5 DnD，无额外依赖）；与箭头按钮同样走服务端重建 |
 | 打回输入框编辑 | 消息内容回填 composer 输入框并从队列移除，编辑后重新发送 |
 | 编辑 / 删除 | 多行文本区直接修改排队内容 / 取消该消息 |
 | 红 / 黄 / 绿规划 | 见「三档语义」 |
-| 取消并清空 | 停止当前执行并清空全部排队消息 |
+| 取消并清空 | 两步确认后停止当前执行并清空全部排队消息（首次点击弹出「确认清空？」） |
+
+排序的**并发保护**：重建期间若某条消息已被 agent 认领（`queue-item-not-found`），本次排序立即中止且不重发，提示「队列已变化，本次排序已取消」——绝不会把变化中的队列排乱。
+
+等待区的**展开状态会记忆**：手动收起/展开后，下次打开插件保持同样状态。
 
 编辑排队消息（行内编辑）时：
 
@@ -106,8 +111,35 @@ dsh web
 npm install --legacy-peer-deps   # @deepseek-ai client 包链在 npm 上不完整，仅装工具链
 npm run build                    # tsc（lib/types）+ tsdown（lib/index.js + lib/client.js）
 node examples/verify-assembly.mjs  # 12 项装配断言
-npm test                         # 32 项 vitest 组件测试
+npm test                         # 36 项 vitest 组件测试
+npm run lint                     # ESLint（src + tests，flat config）
+npm run verify                   # 一体化门禁：lint + test + build + verify-assembly
 ```
+
+## 开发（TDD + Lint）
+
+本项目按 **TDD**（测试驱动开发）维护：先写失败用例，再实现到全绿。
+
+```sh
+npm run tdd        # vitest watch：改动即重跑，红→绿闭环
+```
+
+流程：
+
+1. 在 `tests/` 新增/修改用例（红：确认新行为尚未实现）；
+2. `npm run tdd` 观察失败；
+3. 在 `src/` 最小实现（绿）；
+4. `npm run verify` 全绿后提交（lint + 36 测试 + 构建 + 12 项装配断言）。
+
+Lint 说明：
+
+```sh
+npm run lint       # ESLint flat config（eslint.config.mjs）
+npm run lint:fix   # 自动修复可修复项
+```
+
+- 范围：`src/` 与 `tests/`（TypeScript + React）；构建产物 `lib/` 忽略；
+- 规则：`@typescript-eslint/recommended` + `react-hooks` 最佳实践；未使用变量报错（下划线前缀 `_` 可豁免）。
 
 ## 使用方式
 

@@ -59,9 +59,9 @@ Layout sketch of the waiting area and the freeze button in a session page:
 
 The "Freeze session / Resume session" button on the composer's right (beside the send button) pauses API consumption near DeepSeek peak pricing hours:
 
-- **Freeze**: the current turn is **not interrupted** — it finishes naturally, then the unsent queue is frozen (detached from the waiting area); the dock shows a "Frozen" banner;
-- **Resume**: the frozen messages re-enter the queue and the agent continues in FIFO order;
-- Engine: freeze = detach every queued row via `updateQueue(remove)` (plain-text copies kept in the plugin store); the driver stops naturally once the current turn ends with no pending work; resume = re-submit via `send(text)`, waking the driver;
+- **Freeze**: the current turn is **not interrupted** — it finishes naturally, then consumption pauses. The queue is fully **decoupled from freezing**: freezing only stops the agent from consuming (executing / inserting / appending), while the waiting area stays visible and **fully operable** — reorder, edit, remove and set the red/yellow/green insertion tier, just like when not frozen;
+- **Resume**: the (possibly edited) queue is re-submitted and **each entry executes with its planned tier** (red = interrupt and process immediately, yellow = interject, green = queue); the agent continues in FIFO order;
+- Engine: freeze = detach every queued row via `updateQueue(remove)` (copies with their tiers kept in the plugin store); the driver stops naturally once the current turn ends with no pending work; edits made while frozen (text / order / tier) write back to the store in real time; resume = re-submit via `send(text)`, waking the driver (red-tier entries are preceded by `cancel()`);
 - Note: queued messages containing non-text content (images) cannot be re-sent and are released by the freeze (they do not come back).
 
 ## Queue management
@@ -71,10 +71,15 @@ Each waiting-area message (while not frozen) offers:
 | Action | Description |
 |---|---|
 | Move up / down | Reorder the FIFO queue (the whole queue is rebuilt in the new order; disabled while any image message is queued) |
+| **Drag to reorder** | Drag a row onto its target position (native HTML5 DnD, no extra dependency); same server-side rebuild as the arrow buttons |
 | Edit in composer | Back-fill the message into the composer draft and remove it from the queue for editing |
 | Edit / remove | Edit the queued content in a multi-line editor / cancel the message |
 | Red / yellow / green planning | See "The three tiers" |
-| Cancel and clear | Stop the current run and remove every queued message |
+| Cancel and clear | Two-step confirm, then stop the current run and remove every queued message (first click shows "Confirm clear?") |
+
+**Concurrency protection** for reordering: if a message was already claimed by the agent during the rebuild (`queue-item-not-found`), the reorder stops immediately and nothing is re-sent — the changed queue is never scrambled.
+
+The waiting area's **collapse state is remembered** across sessions.
 
 When editing a queued message (inline):
 
@@ -106,8 +111,35 @@ Local build and tests:
 npm install --legacy-peer-deps   # the @deepseek-ai client package chain is incomplete on npm; toolchain only
 npm run build                    # tsc (lib/types) + tsdown (lib/index.js + lib/client.js)
 node examples/verify-assembly.mjs  # 12 assembly assertions
-npm test                         # 32 vitest component tests
+npm test                         # 36 vitest component tests
+npm run lint                     # ESLint (src + tests, flat config)
+npm run verify                   # one-shot gate: lint + test + build + verify-assembly
 ```
+
+## Development (TDD + Lint)
+
+This project is maintained with **TDD** (test-driven development): write the failing test first, then implement to green.
+
+```sh
+npm run tdd        # vitest watch: re-runs on change, red-to-green loop
+```
+
+Workflow:
+
+1. Add/update a case in `tests/` (red: confirm the new behavior is not implemented yet);
+2. `npm run tdd` and watch it fail;
+3. Implement the minimal change in `src/` (green);
+4. `npm run verify` all green before committing (lint + 36 tests + build + 12 assembly assertions).
+
+Lint:
+
+```sh
+npm run lint       # ESLint flat config (eslint.config.mjs)
+npm run lint:fix   # auto-fix what can be fixed
+```
+
+- Scope: `src/` and `tests/` (TypeScript + React); build output `lib/` is ignored;
+- Rules: `@typescript-eslint/recommended` + `react-hooks` best practices; unused variables are errors (underscore prefix `_` exempts).
 
 ## Usage
 
@@ -193,7 +225,7 @@ End-to-end browser verification on a live `dsh web`, zero application console er
 | Red now | Interrupted message is processed immediately: the agent replies to it explicitly and continues; no stranded intermediate state |
 | Yellow next + green revoke | After interjecting, green pulls the message back to the queue |
 | Freeze / resume | Current turn finishes naturally without interruption, queue frozen with banner; resume drains everything in FIFO order |
-| Queue editing (multi-line / fallback) | Covered by component tests (32/32 green); real-environment re-check pending |
+| Queue editing (multi-line / fallback / drag-reorder / confirm) | Covered by component tests (36/36 green); real-environment re-check pending |
 
 ## References
 

@@ -86,7 +86,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     & Record<string, unknown>
 
   /** Translate thunk bound to one dictionary namespace. */
-  export type TranslateNS<N extends keyof LocaleNamespaceMap & string> =
+  export type TranslateNS<_N extends keyof LocaleNamespaceMap & string> =
     (key: string, params?: Record<string, unknown>) => string
 
   /** Locale seat delivered to slot components. */

@@ -1,8 +1,8 @@
 {
   "name": "dsh-input-traffic",
-  "version": "0.1.1",
+  "version": "0.2.6",
   "type": "module",
-  "description": "Three-tier (now/next/later) input steering for the DeepSeek Harness web GUI: replaces the busy-Enter queue dock with a red/yellow/green planning strip, hides the official busy-Enter behavior row, and keeps plain Enter as queue-later —a cordis client plugin, no dsh source changes, no PR required",
+  "description": "Busy-time input queue for the DeepSeek Harness web GUI: three-tier (now/next/later) planning, queue editing with drag-to-reorder and concurrency protection, interject (steer) and interrupt, batch clear with confirm, session freeze - a cordis client plugin, no dsh source changes, no PR required",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/drscrewdriver/dsh-input-traffic.git"
@@ -40,7 +40,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && tsdown",
     "test": "vitest run",
-    "clean": "node -e \"require('node:fs').rmSync('lib', { recursive: true, force: true })\""
+    "clean": "node -e \"require('node:fs').rmSync('lib', { recursive: true, force: true })\"",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "tdd": "vitest",
+    "verify": "npm run lint && npm run test && npm run build && node examples/verify-assembly.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -86,11 +90,15 @@
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "jsdom": "^29.1.1",
     "lightningcss": "^1.32.0",
     "react": "^18.2.0",
     "tsdown": "^0.22.2",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.8"
   }
 }

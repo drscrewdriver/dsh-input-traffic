@@ -102,6 +102,29 @@
   font-size: 12px;
 }
 
+/* Frozen queue list: read-only rows rendered from the shared freeze store so
+   the waiting area stays visible while the session is paused. */
+.frozenList {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.frozenRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.frozenMark {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ds-color-text-tertiary, #9ca3af);
+}
+
 .clear:hover:not(:disabled) {
   border-color: var(--ds-color-border, rgba(0, 0, 0, 0.12));
   background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.04));
@@ -110,6 +133,33 @@
 .clear:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.clearConfirm {
+  border-color: var(--ds-steer-red, #e5484d);
+  color: var(--ds-steer-red, #e5484d);
+}
+
+.clearConfirm:hover:not(:disabled) {
+  border-color: var(--ds-steer-red, #e5484d);
+  background: color-mix(in srgb, var(--ds-steer-red, #e5484d) 8%, transparent);
+}
+
+.clearCancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ds-color-text-secondary, #6b7280);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.clearCancel:hover:not(:disabled) {
+  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.04));
 }
 
 .clearLabel {
@@ -128,6 +178,20 @@
   gap: 8px;
   padding: 4px 6px;
   border-radius: 6px;
+}
+
+.row[draggable='true'] {
+  cursor: grab;
+}
+
+.row[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.rowDragOver {
+  outline: 2px dashed var(--ds-color-border-strong, rgba(0, 0, 0, 0.25));
+  outline-offset: -2px;
+  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.05));
 }
 
 .row:hover {
