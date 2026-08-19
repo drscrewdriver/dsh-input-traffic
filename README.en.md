@@ -15,6 +15,10 @@
 
 A cordis client plugin assembled via the `dsh plugin` command and a bundle patch — no dsh source changes, no PR required.
 
+> 💡 **Why "Freeze session" is recommended**: DeepSeek moved to **peak/off-peak billing** on 2026-08-17 — the peak window (Beijing time 09:00-12:00, 14:00-18:00) costs **2×** the off-peak rate (all other hours, including lunch, night, weekends and holidays). If a long-running session spans the expensive window, manually freezing pauses API consumption and resuming off-peak can save up to **50%**.
+>
+> **Suggested pairing for now**: use it together with a **reminder** plugin (e.g. [dsh-notify](https://github.com/zhengjy01/dsh-notify), desktop notifications when it is time to freeze/resume) and a **billing/usage** plugin (e.g. [dsh-deepseek-usage](https://github.com/yyb16yyb-hub/dsh-deepseek-usage), [dsh-cost-tracker](https://github.com/yflmq001/dsh-cost-tracker), [dsh-billing-balance](https://github.com/YZz-S/dsh-billing-balance), to verify actual spend around a freeze) — a "remind → freeze → resume off-peak → verify" saving loop.
+
 ## What it does
 
 - **Three tiers coexist**: while the agent is busy, every input lands in a waiting area first, then you choose when it enters the conversation — no longer a single "interrupt" or a single "queue":
@@ -55,7 +59,11 @@ Layout sketch of the waiting area and the freeze button in a session page:
 
 > Why red is cancel + remove + resend: the harness inbox rejects inserting a message that is already pending; steering the original message after an interrupt would be rejected and strand the message (see FAQ).
 
-## Session freeze / resume (peak-hour pause)
+## Session freeze / resume (peak-hour pause) ⭐ Recommended
+
+> **Cost-saving role**: this is the plugin's **core recommended feature** for DeepSeek's peak/off-peak billing (effective 2026-08-17) — the peak window (09:00-12:00, 14:00-18:00) costs double, off-peak is half price. Freezing pauses non-urgent work until off-peak hours, directly avoiding the expensive window; long-running sessions can save up to half the cost.
+>
+> **Suggested pairing**: a **reminder** plugin (e.g. [dsh-notify](https://github.com/zhengjy01/dsh-notify)) notifies you to freeze/resume when entering or leaving the peak window; a **billing/usage** plugin (e.g. [dsh-deepseek-usage](https://github.com/yyb16yyb-hub/dsh-deepseek-usage), [dsh-cost-tracker](https://github.com/yflmq001/dsh-cost-tracker), [dsh-billing-balance](https://github.com/YZz-S/dsh-billing-balance)) verifies the actual spend around a freeze.
 
 The "Freeze session / Resume session" button on the composer's right (beside the send button) pauses API consumption near DeepSeek peak pricing hours:
 
@@ -149,7 +157,7 @@ npm run lint:fix   # auto-fix what can be fixed
    - 🔴 Red = interrupt — stop the current action, the message is processed right away;
    - 🟢 Green = keep queued (the default); on an already-steered message, green revokes it back to the queue;
 3. Reorder / re-edit: use move up/down, "Edit in composer", or the multi-line inline editor (Enter saves, Shift+Enter newline);
-4. Near peak hours: press "Freeze session" on the composer's right; the session pauses after the current turn; press "Resume session" during off-peak hours to continue.
+4. **Cost-saving key (recommended)**: near the peak window (09:00-12:00, 14:00-18:00), press "Freeze session" on the composer's right; the session pauses after the current turn, avoiding the expensive window; press "Resume session" off-peak to continue. Pair with reminder / billing plugins (see "Recommended" above).
 
 ## FAQ
 

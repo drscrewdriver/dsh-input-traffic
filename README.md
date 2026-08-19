@@ -15,6 +15,10 @@
 
 无需修改 dsh 源码、无需提 PR：`dsh plugin` 命令组装 + bundle patch 装配的 cordis client 插件。
 
+> 💡 **为什么推荐「冻结会话」**：DeepSeek 已于 2026-08-17 实行**峰谷计费**——高峰时段（北京时间 9:00-12:00、14:00-18:00）单价为闲时（其余时段，含午间、夜间、周末与节假日）的 **2 倍**。长跑型会话若跨越高价窗口，手动冻结暂停 API 消耗、错峰再恢复，费用最多可省 **50%**。
+>
+> **目前建议搭配**：配合**一般提醒**插件（如 [dsh-notify](https://github.com/zhengjy01/dsh-notify)，到点桌面提醒「该冻结/该恢复」）与**计费统计**插件（如 [dsh-deepseek-usage](https://github.com/yyb16yyb-hub/dsh-deepseek-usage)、[dsh-cost-tracker](https://github.com/yflmq001/dsh-cost-tracker)、[dsh-billing-balance](https://github.com/YZz-S/dsh-billing-balance)，核对冻结前后的实际花费），形成「提醒 → 冻结 → 错峰恢复 → 对账」的省钱闭环。
+
 ## 它能做什么
 
 - **三档插入并存**：智能体忙碌时，每一条输入都先进入等待区，再按需选择何时进入对话——不再只有一个"打断"或只有一个"排队"：
@@ -55,7 +59,11 @@
 
 > 红色为什么是 cancel + remove + resend：harness 的 inbox 禁止重复插入同一条消息，打断后直接 steer 会被拒绝导致消息滞留（详见「常见问题」）。
 
-## 会话冻结 / 恢复（高峰期暂停）
+## 会话冻结 / 恢复（高峰期暂停）⭐ 推荐
+
+> **省钱定位**：这是本插件面向 DeepSeek 峰谷计费（2026-08-17 生效）的**核心推荐功能**——高峰时段（9:00-12:00、14:00-18:00）单价翻倍、闲时半价。手动冻结把不紧急的生成「暂停」到闲时再恢复，直接规避高价窗口，长跑型会话最多省一半费用。
+>
+> **建议搭配**：**一般提醒**插件（如 [dsh-notify](https://github.com/zhengjy01/dsh-notify)）在进入/离开高峰时段时提醒你手动冻结/恢复；**计费统计**插件（如 [dsh-deepseek-usage](https://github.com/yyb16yyb-hub/dsh-deepseek-usage)、[dsh-cost-tracker](https://github.com/yflmq001/dsh-cost-tracker)、[dsh-billing-balance](https://github.com/YZz-S/dsh-billing-balance)）在冻结前后核对实际花费。
 
 输入框右侧（发送按钮旁）的「冻结会话 / 恢复会话」按钮，用于即将进入 DeepSeek 高峰收费时段时暂停 API 消耗：
 
@@ -149,7 +157,7 @@ npm run lint:fix   # 自动修复可修复项
    - 🔴 红色 = 打断——立即中断当前动作，消息随后被处理；
    - 🟢 绿色 = 保持排队（当前默认态）；对已插话的消息点绿 = 收回排队；
 3. 需要调整顺序 / 修改内容：用上移下移、打回输入框编辑或多行编辑（Enter 保存、Shift+Enter 换行）；
-4. 邻近高峰时段：点击输入框右侧「冻结会话」，当前轮次完成后自动暂停；非高价时间点「恢复会话」继续。
+4. **省钱关键（推荐）**：邻近高峰时段（9:00-12:00、14:00-18:00）点击输入框右侧「冻结会话」，当前轮次完成后自动暂停，避开高价窗口；闲时点「恢复会话」继续。可配合提醒 / 计费统计插件使用（见上文「推荐」）。
 
 ## 常见问题
 
