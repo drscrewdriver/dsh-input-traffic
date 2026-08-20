@@ -241,6 +241,18 @@ End-to-end browser verification on a live `dsh web`, zero application console er
 - Semantics reference: [dsh-traffic-light](https://github.com/yimeng-dev/dsh-traffic-light) (desktop session-status traffic light)
 - Harness anchors: `packages/client/AGENTS.md`, `packages/client/tsdown.client.ts`, `packages/client/web/src/platform.ts`, `packages/bundle/web-app/cordis.patch.yml`, `packages/client/ui-conversation/src/client/queue/QueueDock.tsx`, `packages/host/apiproxy/src/api-proxy.ts`
 
+## drscrewdriver DSH Plugin Family
+
+This project is one of the DSH plugins maintained by [drscrewdriver](https://github.com/drscrewdriver). If this one helps you, the others likely will too:
+
+| Plugin | One-liner |
+|---|---|
+| **[dsh-input-traffic](https://github.com/drscrewdriver/dsh-input-traffic)** | Busy-time input queue: three-tier traffic control, drag-to-reorder, session freeze |
+| [dsh-thinking-levels](https://github.com/drscrewdriver/dsh-thinking-levels) | Per-round reasoning_effort control: Auto scheduling or manual wire level |
+| [dsh-seatbelt-sandbox](https://github.com/drscrewdriver/dsh-seatbelt-sandbox) | macOS Seatbelt sandbox adapter: native libsandbox loader replacing deprecated sandbox-exec |
+| [dsh-switch-search](https://github.com/drscrewdriver/dsh-switch-search) | Session content search sidebar: title/content toggle, type-filter by user/reply/tool |
+
 ## License
 
 MIT
+
