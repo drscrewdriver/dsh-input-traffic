@@ -7,6 +7,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-263146?style=flat-square"></a>
   <img alt="Public beta" src="https://img.shields.io/badge/status-public%20beta-7da1de?style=flat-square">
+  [![dshfind](https://dshfind.com/api/badge/drscrewdriver/dsh-input-traffic?lang=zh)](https://dshfind.com/zh/plugins/drscrewdriver/dsh-input-traffic?ref=badge)
 </p>
 
 # dsh-input-traffic
