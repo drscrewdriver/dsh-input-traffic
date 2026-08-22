@@ -30,6 +30,7 @@
 - **队列管理**：等待区的消息可以**上移 / 下移调整顺序**、删除，以及队列级「取消并清空」。
 - **编辑不丢内容**：编辑保存失败（消息已被 agent 认领）时，编辑内容自动退回主输入框，不会丢失；主输入框已有内容时不覆盖。
 - **高峰期冻结**：输入框右侧「冻结会话」按钮——邻近 DeepSeek 高峰收费时段（9:00-12:00、14:00-18:00）时主动暂停 API 消耗：当前轮次自然完成后暂停，未发送队列冻结保存；「恢复会话」后在非高价时间继续处理。
+- **中断检测与续跑**（吸收自 [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue)，纯逻辑层）：会话因网络错误等非人为因素中断、但排队消息未处理完时，等待区顶部出现琥珀色提示条，可点击「续跑」重新发送继续文本唤醒 driver；也可开启**自动续跑**（默认关闭，见「中断检测与续跑」章节）。
 - **接管官方行为**：插件生效时，官方设置面板的「繁忙时 Enter 键行为」设置行不再显示（Enter 行为固定为绿色排队）。
 
 ## 界面预览
@@ -71,6 +72,18 @@
 - **恢复**：按修改后的队列重新入队，**按每条预定的档位执行**（红=打断并立即处理，黄=插话，绿=排队），agent 按 FIFO 继续处理；
 - 引擎实现：冻结 = 逐条 `updateQueue(remove)` 分离队列（含档位的副本存于插件 store），当前轮次完成后 driver 因无 pending 自然停止；冻结期间对队列的修改（文本/顺序/档位）实时写回 store；恢复 = 逐条 `send(text)` 重新提交并唤醒 driver（红色档位的条目先 `cancel()` 再发送）；
 - 注意：含非文本内容（图片）的排队消息无法重发，冻结时会随队列释放（不会恢复）。
+
+## 中断检测与续跑（吸收自 dsh-auto-continue）
+
+会话因**非人为因素**中断（网络错误、超时、5xx 等）后，排队消息会卡在等待区无人处理。本功能在等待区顶部提供**中断提示条**，让你不必盯着页面也能把中断的会话续起来：
+
+- **中断检测**：会话从运行转为停止、但等待区仍有残留排队消息时，顶部出现**琥珀色提示条**「会话可能已中断，{n} 条排队消息未处理完」（纯 client 可观测信号：running 从 true → false + 队列非空 + 未冻结）；
+- **手动续跑**：提示条上的「续跑」按钮立即重新发送配置的继续文本（默认「继续」）唤醒 driver，排队消息随之继续被处理；
+- **自动续跑**（默认关闭）：开启后，检测到中断会等待**宽限期**（默认 3 秒）自动续跑一次；连续失败按**自适应退避**拉长间隔（冷却 × 系数），并受**连续次数上限**保护，达到上限自动停止交回人工——绝不无限续跑；
+- **为什么默认关闭**：纯 client 拿不到 `turn/end` 的失败原因，无法区分「用户主动停止」与「非人为中断」。默认只提示不擅自续跑，避免对用户主动停止的会话误续跑；
+- **与冻结的关系**：冻结时队列被分离（真实队列为空），不会误触发中断提示；续跑与「冻结省钱」方向一致——续跑只唤醒被中断的会话继续消耗，不改变冻结语义。
+
+> **吸收边界**：本功能仅吸收 [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue)（MIT, v0.8.1）的**平台无关纯逻辑**（错误分类 `isTransientFailure` / `isTransientAgentError`、自适应退避 `effectiveCooldown`、幂等护栏 `toolResultFacts`、模板填充 `fillTemplate`），实现于 `src/client/auto-continue-core.ts`。**不搬其 host 引擎**（`session/event` firehose、`agent.followup`、SSE 桥）——那需要把本插件升级为 client + host 双半插件，破坏「纯浏览器侧、不改官方源码」的定位；错误分类等纯逻辑已保留在模块内，供后续扩展（如续跑失败时按分类决定是否继续）。
 
 ## 队列管理
 
@@ -119,7 +132,7 @@ dsh web
 npm install --legacy-peer-deps   # @deepseek-ai client 包链在 npm 上不完整，仅装工具链
 npm run build                    # tsc（lib/types）+ tsdown（lib/index.js + lib/client.js）
 node examples/verify-assembly.mjs  # 12 项装配断言
-npm test                         # 36 项 vitest 组件测试
+npm test                         # 61 项 vitest 组件测试
 npm run lint                     # ESLint（src + tests，flat config）
 npm run verify                   # 一体化门禁：lint + test + build + verify-assembly
 ```
@@ -137,7 +150,7 @@ npm run tdd        # vitest watch：改动即重跑，红→绿闭环
 1. 在 `tests/` 新增/修改用例（红：确认新行为尚未实现）；
 2. `npm run tdd` 观察失败；
 3. 在 `src/` 最小实现（绿）；
-4. `npm run verify` 全绿后提交（lint + 36 测试 + 构建 + 12 项装配断言）。
+4. `npm run verify` 全绿后提交（lint + 61 测试 + 构建 + 12 项装配断言）。
 
 Lint 说明：
 
@@ -213,6 +226,8 @@ src/
     ├── freeze-button.tsx     # 冻结/恢复按钮（conversation.input.right）
     ├── freeze-store.ts       # 冻结状态共享 store（composer 按钮 ↔ dock 横幅）
     ├── hide-enter-row.tsx    # 设置行隐藏（shadowing settings.general.item id composer-enter）
+    ├── auto-continue-core.ts # 中断检测纯逻辑（吸收自 dsh-auto-continue core.ts：错误分类/退避/护栏/模板）
+    ├── auto-continue-store.ts# 中断标记与续跑配置 store（dock 提示条 ↔ localStorage 持久化）
     ├── locales.ts            # steer 字典（zh/en）
     └── *.module.css
 ```
@@ -233,12 +248,13 @@ src/
 | 红色 now | 打断后消息立即被处理：agent 明确回复被打断消息并继续；无滞留中间态 |
 | 黄色 next + 绿色撤回 | 插话后点绿收回排队，消息回到等待区 |
 | 冻结 / 恢复 | 当前轮次自然完成不打断、队列冻结保存、横幅提示；恢复后 FIFO 全部处理完成 |
-| 队列编辑（多行 / 失败退回） | 组件测试覆盖（32 项全绿）；真实环境复核待做 |
+| 队列编辑（多行 / 失败退回） | 组件测试覆盖（61 项全绿）；真实环境复核待做 |
 
 ## 参考
 
 - [dsh-plugin-creation-convention.md](../dsh-plugin-creation-convention.md)（workspace 根部）——本插件遵循的 dsh 插件创建流程规约
 - 语义参考：[dsh-traffic-light](https://github.com/yimeng-dev/dsh-traffic-light)（Session 运行状态红绿灯提示）
+- 吸收来源：[dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue)（MIT, v0.8.1）——中断检测与续跑的纯逻辑来源
 - harness 锚点：`packages/client/AGENTS.md`、`packages/client/tsdown.client.ts`、`packages/client/web/src/platform.ts`、`packages/bundle/web-app/cordis.patch.yml`、`packages/client/ui-conversation/src/client/queue/QueueDock.tsx`、`packages/host/apiproxy/src/api-proxy.ts`
 
 ## License

@@ -29,6 +29,25 @@ const CONVERSATION_SETTINGS_NAMESPACE = 'ui-conversation'
 /** Busy-Enter field inside that namespace; the plugin pins it to queue. */
 const BUSY_ENTER_FIELD = 'busyEnter'
 
+/**
+ * Deliver one plain-text message into the session's next step. The exposed
+ * conversation `send` verb only queues into the next turn, so resume steers
+ * through the session face's steer-mode prompt instead (no harness change).
+ * @param ctx - root context (resolves the session face behind the scope).
+ * @param actx - agent-scoped context of the owning session.
+ * @param text - message text to deliver.
+ */
+function steerPrompt(ctx: ClientContext, actx: ClientContext, text: string): Promise<void> {
+  const session = ctx.sessions.sessionOf(actx)
+  if (session === undefined) return Promise.reject(new Error('steer resume: session scope unavailable'))
+  return session.prompt([{ type: 'text', text }], 'steer').then((result) => {
+    if (!result.ok) {
+      const error = result.error ?? { code: 'unknown', message: 'steer prompt rejected' }
+      throw new Error(`conversation.sendSteer failed: ${error.code}: ${error.message}`)
+    }
+  })
+}
+
 /** Services required by the browser half. */
 export const inject = ['slots', 'locale', 'sessions', 'conversation', 'settingsScope']
 
@@ -65,6 +84,7 @@ export function apply(ctx: ClientContext): void {
         updateQueue: (itemId, action) => conversation.updateQueue(itemId, action),
         cancel: () => conversation.cancel(),
         send: (text) => conversation.send(text),
+        sendSteer: (text) => steerPrompt(ctx, actx, text),
         setDraft: (text) => { conversation.input.for(actx).actions.setDraft(text) },
         notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
       }
@@ -86,6 +106,7 @@ export function apply(ctx: ClientContext): void {
         updateQueue: (itemId, action) => conversation.updateQueue(itemId, action),
         cancel: () => conversation.cancel(),
         send: (text) => conversation.send(text),
+        sendSteer: (text) => steerPrompt(ctx, actx, text),
         setDraft: (text) => { conversation.input.for(actx).actions.setDraft(text) },
         notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
       }

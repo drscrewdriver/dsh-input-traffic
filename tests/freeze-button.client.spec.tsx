@@ -18,6 +18,7 @@ function mount(snap: ConversationSnapshot) {
   const updateQueue = vi.fn().mockResolvedValue(undefined)
   const cancel = vi.fn().mockResolvedValue(undefined)
   const send = vi.fn().mockResolvedValue(undefined)
+  const sendSteer = vi.fn().mockResolvedValue(undefined)
   const notify = vi.fn()
   const t = vi.fn((key: string) => key)
   const props = {
@@ -25,11 +26,12 @@ function mount(snap: ConversationSnapshot) {
     updateQueue,
     cancel,
     send,
+    sendSteer,
     notify,
     t,
   } as unknown as FreezeButtonProps
   const view = render(<FreezeButton {...props} />)
-  return { view, updateQueue, cancel, send, notify, t }
+  return { view, updateQueue, cancel, send, sendSteer, notify, t }
 }
 
 beforeEach(() => {
@@ -66,6 +68,46 @@ describe('FreezeButton', () => {
       fireEvent.click(screen.getByRole('button', { name: 'steer.resume' }))
     })
     expect(cancel).toHaveBeenCalled()
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send).toHaveBeenNthCalledWith(1, '急事')
+    expect(send).toHaveBeenNthCalledWith(2, '排队')
+    expect(freezeStore.getSnapshot()).toEqual({ frozen: false, pending: [] })
+  })
+
+  it('freeze detaches already-steered (next-step) rows as a safe_point plan', async () => {
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
+      { id: 's1', messageId: 's1', placement: 'steering' as const, preview: '插话', text: '插话', content: [] },
+    ]
+    const { updateQueue } = mount(snapshot(rows))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    // The next-step row is detached too — nothing stays in the live queue
+    // while frozen — and keeps its next intent as a safe_point tier.
+    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
+    expect(updateQueue).toHaveBeenCalledWith('s1', { kind: 'remove' })
+    expect(freezeStore.getSnapshot()).toEqual({
+      frozen: true,
+      pending: [{ text: 'a', tier: 'queue' }, { text: '插话', tier: 'safe_point' }],
+    })
+  })
+
+  it('resume re-steers safe_point (yellow) entries into the next step', async () => {
+    const { cancel, send, sendSteer } = mount(snapshot([]))
+    await act(async () => {
+      freezeStore.set({ frozen: true, pending: [
+        { text: '急事', tier: 'force' },
+        { text: '插话', tier: 'safe_point' },
+        { text: '排队', tier: 'queue' },
+      ] })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.resume' }))
+    })
+    expect(cancel).toHaveBeenCalled()
+    // The yellow entry is steered (next-step), not re-queued as later.
+    expect(sendSteer).toHaveBeenCalledWith('插话')
     expect(send).toHaveBeenCalledTimes(2)
     expect(send).toHaveBeenNthCalledWith(1, '急事')
     expect(send).toHaveBeenNthCalledWith(2, '排队')

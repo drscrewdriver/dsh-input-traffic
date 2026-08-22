@@ -30,6 +30,7 @@ A cordis client plugin assembled via the `dsh plugin` command and a bundle patch
 - **Queue management**: messages in the waiting area can be **moved up / down** to reorder, removed, or cleared with the queue-level "cancel and clear".
 - **Edits are never lost**: if saving an edit fails (the agent already claimed the message), the edited content automatically moves back to the composer; an occupied draft is never overwritten.
 - **Peak-hour freeze**: a "Freeze session" button on the composer's right — near DeepSeek peak pricing hours (09:00-12:00, 14:00-18:00) it pauses API consumption: the current turn finishes naturally, then the unsent queue is frozen; "Resume session" continues during off-peak hours.
+- **Interruption detection & continue** (absorbed from [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue), pure-logic layer): when a session stops due to a non-human cause (network error, timeout, 5xx) while queued messages remain unprocessed, an amber banner appears on the waiting area — click "Continue" to re-send the configured continue text and wake the driver; **auto-continue** is also available (off by default, see the dedicated section).
 - **Official behavior takeover**: while the plugin is mounted, the official "busy-Enter behavior" settings row is hidden (Enter stays queue-later).
 
 ## UI preview
@@ -71,6 +72,18 @@ The "Freeze session / Resume session" button on the composer's right (beside the
 - **Resume**: the (possibly edited) queue is re-submitted and **each entry executes with its planned tier** (red = interrupt and process immediately, yellow = interject, green = queue); the agent continues in FIFO order;
 - Engine: freeze = detach every queued row via `updateQueue(remove)` (copies with their tiers kept in the plugin store); the driver stops naturally once the current turn ends with no pending work; edits made while frozen (text / order / tier) write back to the store in real time; resume = re-submit via `send(text)`, waking the driver (red-tier entries are preceded by `cancel()`);
 - Note: queued messages containing non-text content (images) cannot be re-sent and are released by the freeze (they do not come back).
+
+## Interruption detection & continue (absorbed from dsh-auto-continue)
+
+When a session stops due to a **non-human cause** (network error, timeout, 5xx), queued messages get stuck in the waiting area with no one driving them. This feature shows an **interruption banner** at the top of the waiting area so you can pick an interrupted session back up without babysitting the page:
+
+- **Interruption detection**: when the session transitions from running to stopped while queued rows remain, an **amber banner** appears — "The session may have interrupted; {n} queued messages left unprocessed" (a pure-client observable signal: running true→false + non-empty queue + not frozen);
+- **Manual continue**: the banner's "Continue" button immediately re-sends the configured continue text (default "继续") to wake the driver; the queued messages then get processed;
+- **Auto-continue** (off by default): when enabled, an interruption waits out the **grace window** (default 3 s) then auto-continues once; consecutive failures back off adaptively (cooldown × factor) and are capped by the **max-consecutive** limit — it never loops forever;
+- **Why off by default**: a pure client cannot see the `turn/end` failure reason, so it cannot distinguish a user stop from a non-human interruption. It prompts by default rather than sending on its own, to avoid re-running a session the user deliberately stopped;
+- **Relationship to freeze**: freezing detaches the queue (the live queue is empty), so it never triggers the interruption banner; continuing only wakes interrupted work and does not change the freeze semantics.
+
+> **Absorption boundary**: only the **platform-agnostic pure logic** of [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue) (MIT, v0.8.1) is absorbed — failure classification `isTransientFailure` / `isTransientAgentError`, adaptive backoff `effectiveCooldown`, idempotency guard `toolResultFacts`, template filling `fillTemplate` — implemented in `src/client/auto-continue-core.ts`. Its **host engine is not ported** (`session/event` firehose, `agent.followup`, SSE bridge) — that would turn this plugin into a client + host hybrid and break the "pure browser-side, no official-source changes" positioning; the classification logic stays in the module for future extensions (e.g. deciding whether to keep retrying based on the failure class).
 
 ## Queue management
 
@@ -119,7 +132,7 @@ Local build and tests:
 npm install --legacy-peer-deps   # the @deepseek-ai client package chain is incomplete on npm; toolchain only
 npm run build                    # tsc (lib/types) + tsdown (lib/index.js + lib/client.js)
 node examples/verify-assembly.mjs  # 12 assembly assertions
-npm test                         # 36 vitest component tests
+npm test                         # 61 vitest component tests
 npm run lint                     # ESLint (src + tests, flat config)
 npm run verify                   # one-shot gate: lint + test + build + verify-assembly
 ```
@@ -137,7 +150,7 @@ Workflow:
 1. Add/update a case in `tests/` (red: confirm the new behavior is not implemented yet);
 2. `npm run tdd` and watch it fail;
 3. Implement the minimal change in `src/` (green);
-4. `npm run verify` all green before committing (lint + 36 tests + build + 12 assembly assertions).
+4. `npm run verify` all green before committing (lint + 61 tests + build + 12 assembly assertions).
 
 Lint:
 
@@ -212,7 +225,9 @@ src/
     ├── steer-queue-dock.tsx  # three-tier planning dock (shadows conversation.input.dock id queue)
     ├── freeze-button.tsx     # freeze/resume button (conversation.input.right)
     ├── freeze-store.ts       # shared freeze state (composer button ↔ dock banner)
-    ├── hide-enter-row.tsx    # settings-row hiding (shadows settings.general.item id composer-enter)
+    ├── hide-enter-row.tsx    # settings-row hiding (shadowing settings.general.item id composer-enter)
+    ├── auto-continue-core.ts # interruption pure logic (absorbed from dsh-auto-continue core.ts: classification/backoff/guard/template)
+    ├── auto-continue-store.ts# interruption flag + resume-config store (dock banner ↔ localStorage persistence)
     ├── locales.ts            # steer dictionaries (zh/en)
     └── *.module.css
 ```
@@ -233,12 +248,13 @@ End-to-end browser verification on a live `dsh web`, zero application console er
 | Red now | Interrupted message is processed immediately: the agent replies to it explicitly and continues; no stranded intermediate state |
 | Yellow next + green revoke | After interjecting, green pulls the message back to the queue |
 | Freeze / resume | Current turn finishes naturally without interruption, queue frozen with banner; resume drains everything in FIFO order |
-| Queue editing (multi-line / fallback / drag-reorder / confirm) | Covered by component tests (36/36 green); real-environment re-check pending |
+| Queue editing (multi-line / fallback / drag-reorder / confirm) | Covered by component tests (61/61 green); real-environment re-check pending |
 
 ## References
 
 - [dsh-plugin-creation-convention.md](../dsh-plugin-creation-convention.md) (workspace root) — the dsh plugin creation convention this plugin follows
 - Semantics reference: [dsh-traffic-light](https://github.com/yimeng-dev/dsh-traffic-light) (desktop session-status traffic light)
+- Absorption source: [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue) (MIT, v0.8.1) — the pure-logic source for interruption detection & continue
 - Harness anchors: `packages/client/AGENTS.md`, `packages/client/tsdown.client.ts`, `packages/client/web/src/platform.ts`, `packages/bundle/web-app/cordis.patch.yml`, `packages/client/ui-conversation/src/client/queue/QueueDock.tsx`, `packages/host/apiproxy/src/api-proxy.ts`
 
 ## License

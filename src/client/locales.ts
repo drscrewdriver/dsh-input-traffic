@@ -53,6 +53,12 @@ export const zh = {
   'steer.frozenBadge': '已冻结',
   'steer.freezeFailed': '冻结失败，请重试。',
   'steer.resumeFailed': '恢复失败，请重试。',
+  'steer.interrupted': '会话可能已中断，{n} 条排队消息未处理完',
+  'steer.continue': '续跑',
+  'steer.continueAuto': '自动续跑',
+  'steer.continueAuto.on': '已开启：检测到中断后自动重发排队消息',
+  'steer.continueAuto.off': '已关闭：检测到中断后仅提示，需手动续跑',
+  'steer.continueFailed': '续跑失败，请重试。',
 } satisfies Record<string, string>
 
 /** English dictionary (keys mirror zh). */
@@ -105,6 +111,12 @@ export const en: Record<keyof typeof zh, string> = {
   'steer.frozenBadge': 'frozen',
   'steer.freezeFailed': 'Freeze failed, please retry.',
   'steer.resumeFailed': 'Resume failed, please retry.',
+  'steer.interrupted': 'The session may have interrupted; {n} queued messages left unprocessed',
+  'steer.continue': 'Continue',
+  'steer.continueAuto': 'Auto-continue',
+  'steer.continueAuto.on': 'On: queued messages are re-sent automatically after an interruption',
+  'steer.continueAuto.off': 'Off: interruption only shows a prompt; continue manually',
+  'steer.continueFailed': 'Continue failed, please retry.',
 }
 
 /** Dictionary key union. */
