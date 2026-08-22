@@ -3,12 +3,13 @@
  * (yellow steers, red steers then cancels), the queue-level clear, failure
  * surfacing, disabled states, and the empty/collapse shapes.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { SteerQueueDock, planActionFor, badgeFor, resizeEditor } from '../src/client/steer-queue-dock.tsx'
 import type { SteerQueueDockInjected, SteerQueueDockProps } from '../src/client/steer-queue-dock.tsx'
 import { freezeStore, resetFreezeStore } from '../src/client/freeze-store.ts'
+import { resetAutoContinueStore } from '../src/client/auto-continue-store.ts'
 
 function queueRow(id: string, preview: string) {
   return { id, messageId: id, placement: 'queued' as const, preview, text: preview, content: [] }
@@ -35,6 +36,7 @@ function mount(snap: ConversationSnapshot, draft = '') {
     updateQueue,
     cancel,
     send,
+    sendSteer: vi.fn().mockResolvedValue(undefined),
     setDraft,
     notify,
     t,
@@ -363,17 +365,19 @@ describe('SteerQueueDock', () => {
 
 /** Smoke: the injected conversation face accepts the dock's actions. */
 describe('SteerQueueDockInjected shape', () => {
-  it('exposes the five verbs the dock calls', () => {
+  it('exposes the six verbs the dock and freeze control call', () => {
     const face: SteerQueueDockInjected = {
       updateQueue: async () => undefined,
       cancel: async () => undefined,
       send: async () => undefined,
+      sendSteer: async () => undefined,
       setDraft: () => undefined,
       notify: () => undefined,
     }
     expect(typeof face.updateQueue).toBe('function')
     expect(typeof face.cancel).toBe('function')
     expect(typeof face.send).toBe('function')
+    expect(typeof face.sendSteer).toBe('function')
     expect(typeof face.setDraft).toBe('function')
     expect(typeof face.notify).toBe('function')
   })
@@ -551,5 +555,116 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
     expect(header).toBeTruthy()
     fireEvent.click(header as Element)
     expect(localStorage.getItem('dsh-input-traffic:collapsed')).toBe('1')
+  })
+})
+
+/**
+ * auto-continue (absorbed from dsh-auto-continue): the interruption banner is
+ * shown when the session stops (running true→false) while queued rows remain,
+ * the manual "continue" re-sends a wake-up message, and the auto-continue
+ * toggle persists (default off — conservative, since a pure client cannot
+ * distinguish a user stop from a non-human interruption).
+ */
+describe('interruption banner (auto-continue absorbed)', () => {
+  beforeEach(() => {
+    resetAutoContinueStore()
+    try {
+      localStorage.clear()
+    } catch {
+      /* jsdom may not expose storage */
+    }
+  })
+  afterEach(() => {
+    resetAutoContinueStore()
+    vi.useRealTimers()
+  })
+
+  // Mount with a rerenderable snapshot so a running→stopped transition can be
+  // simulated (the dock's own tests pin one snapshot per mount).
+  function mountTransitional(snap: ConversationSnapshot, draft = '') {
+    const updateQueue = vi.fn().mockResolvedValue(undefined)
+    const cancel = vi.fn().mockResolvedValue(undefined)
+    const send = vi.fn().mockResolvedValue(undefined)
+    const setDraft = vi.fn()
+    const notify = vi.fn()
+    const t = vi.fn((key: string, params?: Record<string, unknown>) => {
+      if (key === 'queue.count' && params && typeof params.n === 'number') return String(params.n)
+      if (key === 'steer.interrupted' && params && typeof params.n === 'string') return `interrupted:${params.n}`
+      return key
+    })
+    const makeProps = (s: ConversationSnapshot): SteerQueueDockProps => ({
+      useSession: <T,>(selector: (sn: ConversationSnapshot) => T): T => selector(s),
+      input: { draft, phase: 'plain' as const, queue: s.queue },
+      updateQueue,
+      cancel,
+      send,
+      sendSteer: vi.fn().mockResolvedValue(undefined),
+      setDraft,
+      notify,
+      t,
+    } as unknown as SteerQueueDockProps)
+    const view = render(<SteerQueueDock {...makeProps(snap)} />)
+    const rerender = (s: ConversationSnapshot): void => {
+      act(() => {
+        view.rerender(<SteerQueueDock {...makeProps(s)} />)
+      })
+    }
+    return { view, rerender, updateQueue, cancel, send, notify, t }
+  }
+
+  it('shows the interruption banner when the session stops with queued rows left', () => {
+    const { rerender } = mountTransitional(snapshot([queueRow('m1', 'a')], { running: true }))
+    // Session stops while work remains: the amber banner appears.
+    rerender(snapshot([queueRow('m1', 'a')], { running: false }))
+    expect(screen.getByText('interrupted:1')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'steer.continue' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'steer.continueAuto.off' })).toBeTruthy()
+  })
+
+  it('clears the banner once the queue drains or the session runs again', () => {
+    const { rerender } = mountTransitional(snapshot([queueRow('m1', 'a')], { running: true }))
+    rerender(snapshot([queueRow('m1', 'a')], { running: false }))
+    expect(screen.getByText('interrupted:1')).toBeTruthy()
+    // Work resumes: banner clears.
+    rerender(snapshot([], { running: true }))
+    expect(screen.queryByText('interrupted:1')).toBeNull()
+  })
+
+  it('manual continue re-sends the configured text to wake the driver', async () => {
+    const { rerender, send } = mountTransitional(snapshot([queueRow('m1', 'a')], { running: true }))
+    rerender(snapshot([queueRow('m1', 'a')], { running: false }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.continue' }))
+    })
+    expect(send).toHaveBeenCalledWith('继续')
+  })
+
+  it('auto-continue is off by default and persists the toggle', async () => {
+    const { rerender, send } = mountTransitional(snapshot([queueRow('m1', 'a')], { running: true }))
+    rerender(snapshot([queueRow('m1', 'a')], { running: false }))
+    // Default off: no automatic send fires without a user click.
+    expect(send).not.toHaveBeenCalled()
+    // Toggle on, then let the grace timer elapse.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.continueAuto.off' }))
+    })
+    expect(screen.getByRole('button', { name: 'steer.continueAuto.on' }).getAttribute('aria-pressed')).toBe('true')
+    expect(localStorage.getItem('dsh-input-traffic:auto-continue')).toContain('"autoResume":true')
+  })
+
+  it('auto-continue sends once after the grace window when enabled', async () => {
+    vi.useFakeTimers()
+    const { rerender, send } = mountTransitional(snapshot([queueRow('m1', 'a')], { running: true }))
+    rerender(snapshot([queueRow('m1', 'a')], { running: false }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.continueAuto.off' }))
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(3000) // default graceMs
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(send).toHaveBeenCalledWith('继续')
   })
 })

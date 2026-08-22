@@ -23,7 +23,7 @@
  * run while preserving the queue (keepInbox), resume re-arms the driver by
  * re-sending the first queued row so the preserved work continues.
  */
-import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: the conversation slot/contract declarations (module augmentation
 // for the SlotMap and the session standard kit). No value import crosses the
@@ -34,6 +34,14 @@ import {
   IconEditOutline16, IconQueueOutline14, IconRightUpOutline16, IconTrashOutline16, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { freezeStore, setTierAt, updatePendingAt, removePendingAt, movePending } from './freeze-store.ts'
+import {
+  autoContinueStore,
+  clearInterrupted,
+  markInterrupted,
+  noteRetry,
+  readAutoContinueConfig,
+  setAutoContinueConfig,
+} from './auto-continue-store.ts'
 import css from './steer-queue-dock.module.css'
 
 /** One mutation accepted by the conversation queue verb. */
@@ -55,6 +63,8 @@ export interface SteerQueueDockInjected {
   cancel: () => Promise<void>
   /** Re-send one plain-text message as a queued follow-up (the revoke path). */
   send: (text: string) => Promise<void>
+  /** Re-deliver one plain-text message into the next step (the resume steer path). */
+  sendSteer: (text: string) => Promise<void>
   /** Back-fill the composer draft (the pull-back-to-composer edit path). */
   setDraft: (text: string) => void
   notify: (level: 'info' | 'error', text: string) => void
@@ -137,9 +147,57 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
   // visible — freezing only pauses the running behavior, it must not hide
   // the queued messages.
   const { frozen, pending: frozenPending } = useSyncExternalStore(freezeStore.subscribe, freezeStore.getSnapshot)
+  // Auto-continue state (interruption detection + resume config).
+  const { interrupted } = useSyncExternalStore(autoContinueStore.subscribe, autoContinueStore.getSnapshot)
+  const acConfig = readAutoContinueConfig()
   const listId = useId()
   // The edit textarea; grown to its content on entry and on every input.
   const editorRef = useRef<HTMLTextAreaElement>(null)
+
+  // Interruption detection: the session stops (running true→false) while
+  // queued rows are left unprocessed — the "session stopped but work remains"
+  // signal, the pure-client proxy for a non-human interruption (auto-continue
+  // classifies the failure host-side; here we only observe the stop itself).
+  const pendingResidue = queue.length + steering.length
+  const prevRunning = useRef(running)
+  useEffect(() => {
+    const wasRunning = prevRunning.current
+    prevRunning.current = running
+    if (wasRunning && !running && pendingResidue > 0 && !frozen) {
+      markInterrupted()
+    } else if (running || pendingResidue === 0) {
+      clearInterrupted()
+    }
+  }, [running, pendingResidue, frozen])
+
+  /** Re-send one continue message to wake the driver (queued rows remain and get processed). */
+  const resumeInterrupted = useCallback(async (): Promise<void> => {
+    const state = autoContinueStore.getSnapshot()
+    try {
+      await send(acConfig.continueText)
+      noteRetry(state.consecutive + 1)
+    } catch {
+      notify('error', t('steer.continueFailed'))
+    }
+  }, [acConfig.continueText, send, notify, t])
+
+  // Auto-resume: when enabled, wait graceMs after an interruption then send
+  // once, respecting cooldown and the maxConsecutive cap (stop and hand back
+  // to the user once exhausted).
+  const autoResume = acConfig.autoResume && !acConfig.paused
+  useEffect(() => {
+    if (!interrupted || !autoResume || frozen) return
+    const state = autoContinueStore.getSnapshot()
+    if (Date.now() - state.lastAttemptAt < acConfig.cooldownMs) return
+    if (state.consecutive >= acConfig.maxConsecutive) {
+      clearInterrupted() // 已达连续上限, 停止自动续跑, 交回人工
+      return
+    }
+    const timer = setTimeout(() => {
+      void resumeInterrupted()
+    }, acConfig.graceMs)
+    return () => clearTimeout(timer)
+  }, [interrupted, autoResume, frozen, acConfig.graceMs, acConfig.cooldownMs, acConfig.maxConsecutive, resumeInterrupted])
 
   useEffect(() => {
     if (queue.length === 0 && !collapsed) setCollapsed(true)
@@ -456,6 +514,39 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
         {frozen && (
           <div className={css.frozenBanner} role="status">
             {t('steer.frozen')}
+          </div>
+        )}
+        {/* Interruption banner: the session stopped while queued rows remain.
+            Manual "continue" wakes the driver; the auto-continue toggle
+            persists the preference (default off — be conservative). */}
+        {interrupted && !frozen && (
+          <div className={css.interruptBanner} role="status">
+            <span className={css.interruptText}>
+              {t('steer.interrupted', { n: String(pendingResidue) })}
+            </span>
+            <button
+              type="button"
+              className={css.continue}
+              aria-label={t('steer.continue')}
+              disabled={pendingResidue === 0}
+              onClick={() => {
+                clearInterrupted()
+                void resumeInterrupted()
+              }}
+            >
+              <IconRightUpOutline16 size={14} />
+              <span className={css.continueLabel}>{t('steer.continue')}</span>
+            </button>
+            <button
+              type="button"
+              className={css.continueToggle}
+              aria-label={autoResume ? t('steer.continueAuto.on') : t('steer.continueAuto.off')}
+              aria-pressed={autoResume || undefined}
+              title={autoResume ? t('steer.continueAuto.on') : t('steer.continueAuto.off')}
+              onClick={() => setAutoContinueConfig({ autoResume: !autoResume })}
+            >
+              {t('steer.continueAuto')}
+            </button>
           </div>
         )}
         {/* While frozen the queue is detached into the shared store: render it

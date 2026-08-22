@@ -2,6 +2,28 @@
 
 所有重要变更与 bug 修复记录于此。版本遵循语义化版本（`dsh plugin --profile web add dsh-input-traffic` 安装）。
 
+## 0.3.0 — 2026-08-23
+
+### 新增：中断检测与续跑（吸收自 dsh-auto-continue）
+
+- **现象**：会话因网络错误等非人为因素中断后，等待区里的排队消息无人处理——driver 停了，排队内容卡住，只能手动重新发送。
+- **新增**（纯 client，不改 harness，保持纯浏览器侧定位）：
+  - **中断检测**：会话从运行转为停止、但队列仍有残留消息时，等待区顶部出现**琥珀色提示条**「会话可能已中断，{n} 条排队消息未处理完」；
+  - **续跑**：提示条带「续跑」按钮，点击重新发送配置的继续文本唤醒 driver，排队消息随之继续被处理；也可开启**自动续跑**（默认关闭——纯 client 无法区分用户主动停止与非人为中断，故保守默认仅提示）。
+- **吸收来源**：`src/client/auto-continue-core.ts` 为平台无关纯逻辑（错误分类 `isTransientFailure` / `isTransientAgentError`、自适应退避 `effectiveCooldown`、模板填充 `fillTemplate`、幂等护栏 `toolResultFacts`、配置解析 `resolveConfig`），来自 [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue)（MIT, v0.8.1）——仅吸收纯逻辑，不搬 host 引擎（那会破坏本插件「纯 client、不改源码」定位，且与「冻结会话省钱」方向相反）。
+- **配置**：续跑配置（继续文本 / 宽限期 / 冷却 / 连续上限 / 退避系数与上限 / 自动续跑开关 / 全局暂停）持久化到 localStorage（键 `dsh-input-traffic:auto-continue`），提示条内切换自动续跑开关即可。
+- 测试 45 → 61 项（新增 core / store / dock 中断检测三组用例）。
+
+## 0.2.7 — 2026-08-20
+
+### Bug 修复：冻结不再被「next（黄色）」插入绕过
+
+- **现象**：已点黄的（next-step）消息在冻结时仍会被 agent 消费——冻结只分离了 `queued` 行，`steering`（next-step）行留在队列里无视冻结继续插入；恢复时计划为 next 的消息也被退化成 later（重新排队）而丢失 next 意图。
+- **修复**（「冻结时不放队列」+「恢复时处理 next」）：
+  - `freeze` 同时分离 `queued`（next-turn）与 `steering`（next-step）行，steering 行以 `safe_point`（next）档位存入冻结区——冻结期间真实队列（含 next-step）为空，driver 必然停下；
+  - `resume` 按档位投递：`force`（红）先 `cancel()` 打断、`safe_point`（黄）走 **steer 模式投递到 next-step**（经 session face 的 `steer` prompt，不改 harness）、`queue`（绿）正常排队——恢复后 next 优先级保留，不再退化为 later。
+- **新增注入动词**：`SteerQueueDockInjected.sendSteer(text)`（两个 slot 注册共用，经 `ctx.sessions.sessionOf(...).prompt([text], 'steer')` 实现）。
+
 ## 0.2.6 — 2026-08-19
 
 ### Bug 修复：拖拽启动兼容（部分浏览器无法拖动）

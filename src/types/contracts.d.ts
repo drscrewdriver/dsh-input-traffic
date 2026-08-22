@@ -35,9 +35,19 @@ declare module '@deepseek-ai/dsh-client-runtime/client' {
   /** Session-store selector hook shape delivered to session-scope slots. */
   export type SnapshotSelectorHook<S> = <T>(selector: (snapshot: S) => T) => T
 
+  /** The session face subset the plugin drives (steer-mode prompt delivery). */
+  export interface SessionFace {
+    prompt(
+      content: readonly { type: 'text'; text: string }[],
+      mode: 'queue' | 'steer',
+    ): Promise<{ ok: boolean; error?: { code: string; message: string } }>
+  }
+
   /** Session registry: scope resolution for session-addressed services. */
   export interface ISessions {
     scope(sessionId: SessionId): ClientContext | undefined
+    /** Resolve the session face behind an agent-scoped context. */
+    sessionOf(ctx: ClientContext): SessionFace | undefined
   }
 
   /** The client root context merge the plugin's browser half receives. */
