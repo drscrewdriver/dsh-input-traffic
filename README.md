@@ -101,13 +101,17 @@
 ## 安装
 
 ```sh
-# 方式一：从 npm 安装（推荐）
+# 方式一：从 npm 安装（推荐，稳定发布）
 #   （profile 是 pnpm workspace root，add 需带 -w 参数）
 dsh plugin --profile web add dsh-input-traffic -w
 
-# 方式二：git 或本地路径组装
+# 方式二：GitHub 直装（drscrewdriver fork 专属，先试用新功能）
+#   （本仓库未提交 lib/，装后需在 profile 内现场构建：
+#    cd ~/.dsh/profiles/web/node_modules/dsh-input-traffic && npm install --legacy-peer-deps && npm run build）
+dsh plugin --profile web add github:drscrewdriver/dsh-input-traffic#main
+
+# 方式三：本地路径组装
 # dsh plugin --profile web add /absolute/path/to/dsh-input-traffic -w
-#    （git 安装后需在 profile 的 node_modules 内现场构建：npm install --legacy-peer-deps && npm run build）
 
 # 确认组合树包含新行
 dsh web --dump-config | grep -B1 -A2 'input-traffic'
@@ -115,6 +119,8 @@ dsh web --dump-config | grep -B1 -A2 'input-traffic'
 # 重启 dsh web —— 必做！运行中实例不热载 bundle 层
 dsh web
 ```
+
+> ⚠️ **GitHub 网络可达性**：github: 直装需要能连通 github.com；网络受限时请先配置可用代理或镜像加速，否则 add 会在拉取阶段卡住。
 
 本地构建与测试：
 

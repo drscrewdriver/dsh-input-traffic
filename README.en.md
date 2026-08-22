@@ -98,13 +98,17 @@ When editing a queued message (inline):
 ## Installation
 
 ```sh
-# Option 1: install from npm (recommended)
+# Option 1: install from npm (recommended, stable release)
 #   (the profile is a pnpm workspace root, so -w is required)
 dsh plugin --profile web add dsh-input-traffic -w
 
-# Option 2: assemble from git or a local path
+# Option 2: install directly from GitHub (drscrewdriver fork — trial new features first)
+#   (lib/ is not committed; after install build in the profile:
+#    cd ~/.dsh/profiles/web/node_modules/dsh-input-traffic && npm install --legacy-peer-deps && npm run build)
+dsh plugin --profile web add github:drscrewdriver/dsh-input-traffic#main
+
+# Option 3: assemble from a local path
 # dsh plugin --profile web add /absolute/path/to/dsh-input-traffic -w
-#    (after git install, build in the profile's node_modules: npm install --legacy-peer-deps && npm run build)
 
 # Confirm the composed tree contains the new row
 dsh web --dump-config | grep -B1 -A2 'input-traffic'
@@ -112,6 +116,8 @@ dsh web --dump-config | grep -B1 -A2 'input-traffic'
 # Restart dsh web — required! A running instance does not hot-load the bundle layer
 dsh web
 ```
+
+> ⚠️ **GitHub reachability**: installing via github: requires access to github.com; if your network is restricted, set up a working proxy or mirror first, otherwise add may stall while fetching.
 
 Local build and tests:
 
