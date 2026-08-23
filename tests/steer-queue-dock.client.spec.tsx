@@ -568,6 +568,7 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
 describe('interruption banner (auto-continue absorbed)', () => {
   beforeEach(() => {
     resetAutoContinueStore()
+    resetFreezeStore()
     try {
       localStorage.clear()
     } catch {
@@ -666,5 +667,67 @@ describe('interruption banner (auto-continue absorbed)', () => {
       await Promise.resolve()
     })
     expect(send).toHaveBeenCalledWith('继续')
+  })
+
+  // Freeze is first-class: pausing consumption must stand down every
+  // auto-continue path — no interruption flag, no banner, no resume send while
+  // frozen (freezing must never be bypassed by an auto-continue wake).
+  it('freeze clears any pending interruption banner', () => {
+    const { rerender } = mountTransitional(snapshot([queueRow('m1', 'a')], { running: true }))
+    // Session stops with work left: banner appears.
+    rerender(snapshot([queueRow('m1', 'a')], { running: false }))
+    expect(screen.getByText('interrupted:1')).toBeTruthy()
+    // Freeze takes over: the interruption banner must disappear.
+    act(() => {
+      freezeStore.set({ frozen: true, pending: [{ text: 'a', tier: 'queue' }] })
+    })
+    expect(screen.queryByText('interrupted:1')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'steer.continue' })).toBeNull()
+  })
+
+  it('a stop while frozen does not flag an interruption', () => {
+    // Freeze while the session is running; the current turn finishes naturally
+    // (running true→false) while frozen.
+    act(() => {
+      freezeStore.set({ frozen: true, pending: [] })
+    })
+    const { rerender } = mountTransitional(snapshot([], { running: true }))
+    rerender(snapshot([], { running: false }))
+    // No interruption: freezing paused consumption, this is not a failure.
+    expect(screen.queryByText(/interrupted/)).toBeNull()
+  })
+
+  it('manual continue is a no-op while frozen (freeze is first-class)', async () => {
+    const { rerender, send } = mountTransitional(snapshot([queueRow('m1', 'a')], { running: true }))
+    // Trigger interruption state, then freeze.
+    rerender(snapshot([queueRow('m1', 'a')], { running: false }))
+    act(() => {
+      freezeStore.set({ frozen: true, pending: [{ text: 'a', tier: 'queue' }] })
+    })
+    // The banner is hidden while frozen; even if a stale resume fires, the
+    // freeze guard in resumeInterrupted must swallow it.
+    expect(screen.queryByRole('button', { name: 'steer.continue' })).toBeNull()
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('auto-continue does not fire while frozen even if a grace timer was scheduled', async () => {
+    vi.useFakeTimers()
+    const { rerender, send } = mountTransitional(snapshot([queueRow('m1', 'a')], { running: true }))
+    rerender(snapshot([queueRow('m1', 'a')], { running: false }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.continueAuto.off' }))
+    })
+    // Freeze before the grace window elapses: the scheduled auto-resume must
+    // not send (both the effect guard and resumeInterrupted's freeze guard).
+    act(() => {
+      freezeStore.set({ frozen: true, pending: [{ text: 'a', tier: 'queue' }] })
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(3000) // default graceMs
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(send).not.toHaveBeenCalled()
   })
 })

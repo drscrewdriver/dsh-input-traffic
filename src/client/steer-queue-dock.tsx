@@ -158,20 +158,37 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
   // queued rows are left unprocessed — the "session stopped but work remains"
   // signal, the pure-client proxy for a non-human interruption (auto-continue
   // classifies the failure host-side; here we only observe the stop itself).
+  // Freeze is first-class: while frozen the interruption state is cleared and
+  // no resume path may run (freezing pauses consumption; auto-continue must
+  // never wake the driver during a planned peak-hour pause).
   const pendingResidue = queue.length + steering.length
   const prevRunning = useRef(running)
   useEffect(() => {
+    if (frozen) {
+      // 冻结期间同步 running 基准: 冻结中当前轮次自然完成后 running 变 false,
+      // 若不更新 prevRunning, 解冻后会把「冻结期间停下」误判成中断。
+      clearInterrupted()
+      prevRunning.current = running
+      return
+    }
     const wasRunning = prevRunning.current
     prevRunning.current = running
-    if (wasRunning && !running && pendingResidue > 0 && !frozen) {
+    if (wasRunning && !running && pendingResidue > 0) {
       markInterrupted()
     } else if (running || pendingResidue === 0) {
       clearInterrupted()
     }
   }, [running, pendingResidue, frozen])
 
-  /** Re-send one continue message to wake the driver (queued rows remain and get processed). */
+  /**
+   * Re-send one continue message to wake the driver (queued rows remain and
+   * get processed). Freeze guard is first-class: this is the single resume
+   * funnel for both the manual button and the auto-continue timer, so the
+   * frozen check lives here — not only at the call sites — so no path can
+   * wake the driver while the session is frozen.
+   */
   const resumeInterrupted = useCallback(async (): Promise<void> => {
+    if (freezeStore.getSnapshot().frozen) return // 冻结是一等公民: 冻结绝不续跑
     const state = autoContinueStore.getSnapshot()
     try {
       await send(acConfig.continueText)

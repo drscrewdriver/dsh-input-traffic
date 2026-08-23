@@ -13,6 +13,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { freezeStore } from './freeze-store.ts'
 import type { FrozenTier } from './freeze-store.ts'
+import { clearInterrupted } from './auto-continue-store.ts'
 import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import css from './freeze-button.module.css'
 
@@ -27,6 +28,11 @@ export function FreezeButton({ session, updateQueue, cancel, send, sendSteer, no
   const { frozen } = useSyncExternalStore(freezeStore.subscribe, freezeStore.getSnapshot)
 
   const freeze = async (): Promise<void> => {
+    // Freeze is first-class: pausing consumption must also stand down any
+    // pending auto-continue interruption state — no resume path may run while
+    // frozen (auto-continue must never wake the driver during a planned
+    // peak-hour pause).
+    clearInterrupted()
     // Detach every pending input row — queued (next-turn) and already-steered
     // (next-step) alike — so nothing stays in the live queue while frozen.
     // Steered rows keep their next intent as a safe_point plan for resume.

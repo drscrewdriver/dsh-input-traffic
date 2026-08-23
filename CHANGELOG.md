@@ -12,7 +12,8 @@
   - **续跑**：提示条带「续跑」按钮，点击重新发送配置的继续文本唤醒 driver，排队消息随之继续被处理；也可开启**自动续跑**（默认关闭——纯 client 无法区分用户主动停止与非人为中断，故保守默认仅提示）。
 - **吸收来源**：`src/client/auto-continue-core.ts` 为平台无关纯逻辑（错误分类 `isTransientFailure` / `isTransientAgentError`、自适应退避 `effectiveCooldown`、模板填充 `fillTemplate`、幂等护栏 `toolResultFacts`、配置解析 `resolveConfig`），来自 [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue)（MIT, v0.8.1）——仅吸收纯逻辑，不搬 host 引擎（那会破坏本插件「纯 client、不改源码」定位，且与「冻结会话省钱」方向相反）。
 - **配置**：续跑配置（继续文本 / 宽限期 / 冷却 / 连续上限 / 退避系数与上限 / 自动续跑开关 / 全局暂停）持久化到 localStorage（键 `dsh-input-traffic:auto-continue`），提示条内切换自动续跑开关即可。
-- 测试 45 → 61 项（新增 core / store / dock 中断检测三组用例）。
+- **冻结是一等公民**：续跑的一切路径都以冻结为最高优先级——`freeze()` 时显式清除中断状态；冻结期间中断检测不触发、提示条不显示、手动「续跑」与已排定的自动续跑定时器都不会发送（`resumeInterrupted` 函数级冻结守卫兜底，即使定时器在冻结前已排定也不触发）；冻结中会话自然停止不会被误判为中断。
+- 测试 45 → 65 项（新增 core / store / dock 中断检测三组用例 + 4 项冻结一等公民保障用例）。
 
 ## 0.2.7 — 2026-08-20
 
