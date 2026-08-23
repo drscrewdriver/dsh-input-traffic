@@ -6,8 +6,8 @@
 }
 
 .panel {
-  background: var(--ds-color-surface, rgba(255, 255, 255, 0.8));
-  border: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.08));
+  background: var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.8));
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.08));
   border-radius: 10px;
   overflow: hidden;
 }
@@ -17,7 +17,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.06));
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.06));
 }
 
 .header {
@@ -27,7 +27,7 @@
   padding: 2px 6px;
   border: 0;
   background: transparent;
-  color: var(--ds-color-text-secondary, #6b7280);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 12px;
   cursor: pointer;
 }
@@ -38,7 +38,7 @@
 
 .lead {
   display: inline-flex;
-  color: var(--ds-color-text-tertiary, #9ca3af);
+  color: var(--dsw-alias-label-tertiary, #9ca3af);
 }
 
 .count {
@@ -47,7 +47,7 @@
 
 .chevron {
   display: inline-flex;
-  color: var(--ds-color-text-tertiary, #9ca3af);
+  color: var(--dsw-alias-label-tertiary, #9ca3af);
 }
 
 .toolbarActions {
@@ -62,7 +62,7 @@
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: var(--ds-color-text-secondary, #6b7280);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 12px;
   cursor: pointer;
 }
@@ -72,21 +72,21 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  border: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
   border-radius: 6px;
   background: transparent;
-  color: var(--ds-color-text-secondary, #6b7280);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 12px;
   cursor: pointer;
 }
 
 .freeze[aria-pressed='true'] {
-  border-color: var(--ds-steer-green, #30a46c);
-  color: var(--ds-steer-green, #30a46c);
+  border-color: var(--dsw-alias-state-success-primary, #30a46c);
+  color: var(--dsw-alias-state-success-primary, #30a46c);
 }
 
 .freeze:hover:not(:disabled) {
-  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.04));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.04));
 }
 
 .freeze:disabled {
@@ -96,9 +96,9 @@
 
 .frozenBanner {
   padding: 4px 10px;
-  border-bottom: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.06));
-  background: color-mix(in srgb, var(--ds-steer-green, #30a46c) 8%, transparent);
-  color: var(--ds-steer-green, #30a46c);
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.06));
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #30a46c) 8%, transparent);
+  color: var(--dsw-alias-state-success-primary, #30a46c);
   font-size: 12px;
 }
 
@@ -122,12 +122,12 @@
   flex: none;
   margin-left: auto;
   font-size: 11px;
-  color: var(--ds-color-text-tertiary, #9ca3af);
+  color: var(--dsw-alias-label-tertiary, #9ca3af);
 }
 
 .clear:hover:not(:disabled) {
-  border-color: var(--ds-color-border, rgba(0, 0, 0, 0.12));
-  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.04));
+  border-color: var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.04));
 }
 
 .clear:disabled {
@@ -136,13 +136,13 @@
 }
 
 .clearConfirm {
-  border-color: var(--ds-steer-red, #e5484d);
-  color: var(--ds-steer-red, #e5484d);
+  border-color: var(--dsw-alias-state-error-primary, #e5484d);
+  color: var(--dsw-alias-state-error-primary, #e5484d);
 }
 
 .clearConfirm:hover:not(:disabled) {
-  border-color: var(--ds-steer-red, #e5484d);
-  background: color-mix(in srgb, var(--ds-steer-red, #e5484d) 8%, transparent);
+  border-color: var(--dsw-alias-state-error-primary, #e5484d);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5484d) 8%, transparent);
 }
 
 .clearCancel {
@@ -153,13 +153,13 @@
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: var(--ds-color-text-secondary, #6b7280);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 12px;
   cursor: pointer;
 }
 
 .clearCancel:hover:not(:disabled) {
-  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.04));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.04));
 }
 
 .clearLabel {
@@ -189,13 +189,13 @@
 }
 
 .rowDragOver {
-  outline: 2px dashed var(--ds-color-border-strong, rgba(0, 0, 0, 0.25));
+  outline: 2px dashed var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.25));
   outline-offset: -2px;
-  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.05));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
 }
 
 .row:hover {
-  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.03));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.03));
 }
 
 /* Editing rows grow with their content: the toolbar stays top-aligned. */
@@ -210,7 +210,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
-  color: var(--ds-color-text, #1f2937);
+  color: var(--dsw-alias-label-primary, #1f2937);
 }
 
 /* Tier badge: colored dot + label projected from the row placement. */
@@ -231,30 +231,30 @@
 }
 
 .badgeNow {
-  color: var(--ds-steer-red, #e5484d);
-  background: color-mix(in srgb, var(--ds-steer-red, #e5484d) 10%, transparent);
+  color: var(--dsw-alias-state-error-primary, #e5484d);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5484d) 10%, transparent);
 }
 
 .badgeNext {
-  color: var(--ds-steer-yellow, #e8a33d);
-  background: color-mix(in srgb, var(--ds-steer-yellow, #e8a33d) 12%, transparent);
+  color: var(--dsw-alias-state-warn-primary, #e8a33d);
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #e8a33d) 12%, transparent);
 }
 
 .badgeLater {
-  color: var(--ds-steer-green, #30a46c);
-  background: color-mix(in srgb, var(--ds-steer-green, #30a46c) 12%, transparent);
+  color: var(--dsw-alias-state-success-primary, #30a46c);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #30a46c) 12%, transparent);
 }
 
 .badgeNow .dot {
-  background: var(--ds-steer-red, #e5484d);
+  background: var(--dsw-alias-state-error-primary, #e5484d);
 }
 
 .badgeNext .dot {
-  background: var(--ds-steer-yellow, #e8a33d);
+  background: var(--dsw-alias-state-warn-primary, #e8a33d);
 }
 
 .badgeLater .dot {
-  background: var(--ds-steer-green, #30a46c);
+  background: var(--dsw-alias-state-success-primary, #30a46c);
 }
 
 /* Read-only rows for messages already admitted into the running turn. */
@@ -273,9 +273,9 @@
   flex: 1;
   min-width: 0;
   padding: 4px 6px;
-  border: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.15));
+  border: 1px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.15));
   border-radius: 6px;
-  background: var(--ds-color-surface, #fff);
+  background: var(--dsw-alias-bg-layer-2, #fff);
   font-size: 13px;
   line-height: 20px;
   resize: none;
@@ -298,13 +298,13 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--ds-color-text-tertiary, #9ca3af);
+  color: var(--dsw-alias-label-tertiary, #9ca3af);
   cursor: pointer;
 }
 
 .action:hover:not(:disabled) {
-  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.05));
-  color: var(--ds-color-text, #1f2937);
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary, #1f2937);
 }
 
 .action:disabled {
@@ -319,7 +319,7 @@
   gap: 2px;
   margin-left: 4px;
   padding-left: 6px;
-  border-left: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.08));
+  border-left: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.08));
 }
 
 .tier {
@@ -336,7 +336,7 @@
 }
 
 .tier:hover:not(:disabled) {
-  border-color: var(--ds-color-border, rgba(0, 0, 0, 0.2));
+  border-color: var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.2));
 }
 
 .tier:disabled {
@@ -344,8 +344,8 @@
 }
 
 .tierLater {
-  border-color: var(--ds-steer-green, #30a46c);
-  background: color-mix(in srgb, var(--ds-steer-green, #30a46c) 12%, transparent);
+  border-color: var(--dsw-alias-state-success-primary, #30a46c);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #30a46c) 12%, transparent);
 }
 
 .dot {
@@ -355,13 +355,13 @@
 }
 
 .tierNow .dot {
-  background: var(--ds-steer-red, #e5484d);
+  background: var(--dsw-alias-state-error-primary, #e5484d);
 }
 
 .tierNext .dot {
-  background: var(--ds-steer-yellow, #e8a33d);
+  background: var(--dsw-alias-state-warn-primary, #e8a33d);
 }
 
 .tierLater .dot {
-  background: var(--ds-steer-green, #30a46c);
+  background: var(--dsw-alias-state-success-primary, #30a46c);
 }
