@@ -1,7 +1,7 @@
 # dsh 插件「字体颜色 / 配色跟随系统」改造教程
 
 > 适用：任何 dsh client 插件想把自绘颜色改成**自动跟随系统深色模式 / dsh 暗色主题**。
-> 以本仓库（dsh-input-traffic 0.2.7，分支 `feat/day-night-mode`）的队列框改造为完整样例。
+> 以本仓库（dsh-input-traffic 0.2.8，分支 `feat/day-night-mode`）的队列框改造为完整样例。
 
 ## 一、背景：为什么插件颜色不随系统变
 
