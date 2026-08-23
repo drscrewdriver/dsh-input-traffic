@@ -6,23 +6,23 @@
   gap: 4px;
   height: 24px;
   padding: 0 8px;
-  border: 1px solid var(--ds-color-border, rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
   border-radius: 6px;
   background: transparent;
-  color: var(--ds-color-text-secondary, #6b7280);
+  color: var(--dsw-alias-label-secondary, #6b7280);
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .freeze:hover:not(:disabled) {
-  background: var(--ds-color-surface-hover, rgba(0, 0, 0, 0.04));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.04));
 }
 
 .freeze[aria-pressed='true'] {
-  border-color: var(--ds-steer-green, #30a46c);
-  color: var(--ds-steer-green, #30a46c);
-  background: color-mix(in srgb, var(--ds-steer-green, #30a46c) 8%, transparent);
+  border-color: var(--dsw-alias-state-success-primary, #30a46c);
+  color: var(--dsw-alias-state-success-primary, #30a46c);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #30a46c) 8%, transparent);
 }
 
 .label {
