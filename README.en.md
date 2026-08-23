@@ -30,7 +30,7 @@ A cordis client plugin assembled via the `dsh plugin` command and a bundle patch
 - **Queue management**: messages in the waiting area can be **moved up / down** to reorder, removed, or cleared with the queue-level "cancel and clear".
 - **Edits are never lost**: if saving an edit fails (the agent already claimed the message), the edited content automatically moves back to the composer; an occupied draft is never overwritten.
 - **Peak-hour freeze**: a "Freeze session" button on the composer's right — near DeepSeek peak pricing hours (09:00-12:00, 14:00-18:00) it pauses API consumption: the current turn finishes naturally, then the unsent queue is frozen; "Resume session" continues during off-peak hours.
-- **Interruption detection & continue** (absorbed from [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue), pure-logic layer): when a session stops due to a non-human cause (network error, timeout, 5xx) while queued messages remain unprocessed, an amber banner appears on the waiting area — click "Continue" to re-send the configured continue text and wake the driver; **auto-continue** is also available (off by default, see the dedicated section).
+- **Interruption detection & continue** (absorbed from [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue), pure-logic layer): when a session stops due to a non-human cause (network error, timeout, 5xx) while queued messages remain unprocessed, an amber banner appears on the waiting area — click "Continue" to re-send the configured continue text and wake the driver; **auto-continue** is also available (off by default, see the dedicated section). **Freeze is first-class**: every resume path (manual / auto / an already-scheduled timer) is blocked by the freeze guard while frozen, so auto-continue never disturbs a planned cost-saving pause.
 - **Official behavior takeover**: while the plugin is mounted, the official "busy-Enter behavior" settings row is hidden (Enter stays queue-later).
 
 ## UI preview
@@ -81,7 +81,7 @@ When a session stops due to a **non-human cause** (network error, timeout, 5xx),
 - **Manual continue**: the banner's "Continue" button immediately re-sends the configured continue text (default "继续") to wake the driver; the queued messages then get processed;
 - **Auto-continue** (off by default): when enabled, an interruption waits out the **grace window** (default 3 s) then auto-continues once; consecutive failures back off adaptively (cooldown × factor) and are capped by the **max-consecutive** limit — it never loops forever;
 - **Why off by default**: a pure client cannot see the `turn/end` failure reason, so it cannot distinguish a user stop from a non-human interruption. It prompts by default rather than sending on its own, to avoid re-running a session the user deliberately stopped;
-- **Relationship to freeze**: freezing detaches the queue (the live queue is empty), so it never triggers the interruption banner; continuing only wakes interrupted work and does not change the freeze semantics.
+- **Freeze is first-class**: freezing must be an absolute pause that no resume can disturb. Every resume path treats freeze as the highest priority — `freeze()` explicitly clears the interruption state; while frozen, interruption detection does not fire, the banner does not render, and neither the manual "Continue" button nor an already-scheduled auto-continue timer sends (`resumeInterrupted`'s function-level freeze guard is the backstop, so even a timer scheduled before the freeze never fires); a natural stop while frozen is never misread as an interruption.
 
 > **Absorption boundary**: only the **platform-agnostic pure logic** of [dsh-auto-continue](https://github.com/HsiangNianian/dsh-auto-continue) (MIT, v0.8.1) is absorbed — failure classification `isTransientFailure` / `isTransientAgentError`, adaptive backoff `effectiveCooldown`, idempotency guard `toolResultFacts`, template filling `fillTemplate` — implemented in `src/client/auto-continue-core.ts`. Its **host engine is not ported** (`session/event` firehose, `agent.followup`, SSE bridge) — that would turn this plugin into a client + host hybrid and break the "pure browser-side, no official-source changes" positioning; the classification logic stays in the module for future extensions (e.g. deciding whether to keep retrying based on the failure class).
 
@@ -132,7 +132,7 @@ Local build and tests:
 npm install --legacy-peer-deps   # the @deepseek-ai client package chain is incomplete on npm; toolchain only
 npm run build                    # tsc (lib/types) + tsdown (lib/index.js + lib/client.js)
 node examples/verify-assembly.mjs  # 12 assembly assertions
-npm test                         # 61 vitest component tests
+npm test                         # 65 vitest component tests
 npm run lint                     # ESLint (src + tests, flat config)
 npm run verify                   # one-shot gate: lint + test + build + verify-assembly
 ```
@@ -150,7 +150,7 @@ Workflow:
 1. Add/update a case in `tests/` (red: confirm the new behavior is not implemented yet);
 2. `npm run tdd` and watch it fail;
 3. Implement the minimal change in `src/` (green);
-4. `npm run verify` all green before committing (lint + 61 tests + build + 12 assembly assertions).
+4. `npm run verify` all green before committing (lint + 65 tests + build + 12 assembly assertions).
 
 Lint:
 
@@ -248,7 +248,7 @@ End-to-end browser verification on a live `dsh web`, zero application console er
 | Red now | Interrupted message is processed immediately: the agent replies to it explicitly and continues; no stranded intermediate state |
 | Yellow next + green revoke | After interjecting, green pulls the message back to the queue |
 | Freeze / resume | Current turn finishes naturally without interruption, queue frozen with banner; resume drains everything in FIFO order |
-| Queue editing (multi-line / fallback / drag-reorder / confirm) | Covered by component tests (61/61 green); real-environment re-check pending |
+| Queue editing (multi-line / fallback / drag-reorder / confirm) | Covered by component tests (65/65 green); real-environment re-check pending |
 
 ## References
 
