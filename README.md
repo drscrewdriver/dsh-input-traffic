@@ -23,6 +23,7 @@
 
 ## 它能做什么
 <img width="1809" height="547" alt="image" src="https://github.com/user-attachments/assets/4a89687b-5444-4538-b1b2-f0fd093cdd10" />
+<img width="1051" height="302" alt="image" src="https://github.com/user-attachments/assets/710a101e-9ba1-41f0-b74d-bb0ccca77928" />
 
 - **三档插入并存**：智能体忙碌时，每一条输入都先进入等待区，再按需选择何时进入对话——不再只有一个"打断"或只有一个"排队"：
   - 🔴 **红色（now）**：打断当前轮次并立即输入——当前生成停止，消息作为新输入被 agent 立刻处理并回复；
