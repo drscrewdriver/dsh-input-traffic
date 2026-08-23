@@ -2,6 +2,14 @@
 
 所有重要变更与 bug 修复记录于此。版本遵循语义化版本（`dsh plugin --profile web add dsh-input-traffic` 安装）。
 
+## 0.2.7 — 2026-08-24
+
+### 新增：日夜模式自动适配
+
+- 队列框（等待区 dock）与冻结按钮的配色从自绘 `--ds-color-*`（dsh 中不存在该 token）改为引用 dsh 官方语义 token（`--dsw-alias-*`：bg-layer / border-l / label / interactive-bg-hover / state-success|warn|error-primary）。
+- 效果：系统深色模式或 dsh 暗色主题（`body[data-ds-dark-theme]`）下自动切换为**深灰底 + 白色反色字**，三档色使用官方暗色适配值（对比度由 dsh 保证）；白天外观保持不变。
+- 纯 CSS token 映射，零 JS 改动、无新增设置项。
+
 ## 0.2.6 — 2026-08-19
 
 ### Bug 修复：拖拽启动兼容（部分浏览器无法拖动）

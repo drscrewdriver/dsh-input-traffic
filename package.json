@@ -1,6 +1,6 @@
 {
   "name": "dsh-input-traffic",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "module",
   "description": "Busy-time input queue for the DeepSeek Harness web GUI: three-tier (now/next/later) planning, queue editing with drag-to-reorder and concurrency protection, interject (steer) and interrupt, batch clear with confirm, session freeze - a cordis client plugin, no dsh source changes, no PR required",
   "repository": {

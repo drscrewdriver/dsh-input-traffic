@@ -31,6 +31,7 @@ A cordis client plugin assembled via the `dsh plugin` command and a bundle patch
 - **Edits are never lost**: if saving an edit fails (the agent already claimed the message), the edited content automatically moves back to the composer; an occupied draft is never overwritten.
 - **Peak-hour freeze**: a "Freeze session" button on the composer's right — near DeepSeek peak pricing hours (09:00-12:00, 14:00-18:00) it pauses API consumption: the current turn finishes naturally, then the unsent queue is frozen; "Resume session" continues during off-peak hours.
 - **Official behavior takeover**: while the plugin is mounted, the official "busy-Enter behavior" settings row is hidden (Enter stays queue-later).
+- **Day/night auto-adapt**: the dock and the freeze button use dsh's official semantic tokens (`--dsw-alias-*`) exclusively, so they follow the system dark mode / dsh dark theme automatically — in dark mode they switch to a **dark-gray surface with inverted (white) text**, with no configuration (see "Day/night mode").
 
 ## UI preview
 
@@ -94,6 +95,14 @@ When editing a queued message (inline):
 - **Auto-grow**: the editor grows with the content in real time; long messages expand fully, up to about 8 rows, then scroll internally;
 - **Shortcuts**: `Enter` saves, `Shift+Enter` inserts a newline, `Esc` cancels (composition input is protected from accidental saves);
 - **Failure fallback**: if the save fails because the agent already claimed the message (e.g. "started sending"), the edited content automatically moves back to the composer with a notice — **nothing is lost**; the back-fill only happens when the composer is empty, so an existing draft is never overwritten.
+
+## Day/night mode (automatic dark adaptation)
+
+The dock and the freeze button **no longer use hand-drawn colors** — they reference dsh's official semantic tokens (`--dsw-alias-*`: `bg-layer-*` / `border-l*` / `label-*` / `interactive-bg-hover` / `state-success|warn|error-primary`) maintained by the dsh theme system:
+
+- **Automatic follow**: dsh's default theme preference is "system" — when the OS switches to dark mode (or you pick a dark theme in dsh settings), `body[data-ds-dark-theme]` takes effect and the tokens switch to the dark palette, so the dock becomes a **dark-gray surface with inverted (white) text** and the tier colors use the official dark-adapted values (contrast is guaranteed by dsh);
+- **No configuration**: the plugin does not watch the system and adds no settings — light/dark is fully delegated to the dsh theme; the day appearance is unchanged;
+- **Scope**: the waiting-area dock (including the frozen banner / frozen list) and the "Freeze session" button on the composer's right.
 
 ## Installation
 
