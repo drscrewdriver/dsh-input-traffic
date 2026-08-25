@@ -37,15 +37,12 @@ const BUSY_ENTER_FIELD = 'busyEnter'
  * @param actx - agent-scoped context of the owning session.
  * @param text - message text to deliver.
  */
-function steerPrompt(ctx: ClientContext, actx: ClientContext, text: string): Promise<void> {
-  const session = ctx.sessions.sessionOf(actx)
-  if (session === undefined) return Promise.reject(new Error('steer resume: session scope unavailable'))
-  return session.prompt([{ type: 'text', text }], 'steer').then((result) => {
-    if (!result.ok) {
-      const error = result.error ?? { code: 'unknown', message: 'steer prompt rejected' }
-      throw new Error(`conversation.sendSteer failed: ${error.code}: ${error.message}`)
-    }
-  })
+function steerPrompt(actx: ClientContext, text: string): Promise<void> {
+  // steer-mode prompt 面在本版（main@0.2.8）契约中未声明；resume 落到 conversation.send
+  // （排队到下一轮）交付 safe_point 文本，与 feature 分支语义对齐但取当前可用 API。
+  const conversation = actx.get<IConversation>('conversation')
+  if (conversation === undefined) return Promise.reject(new Error('steer resume: conversation service unavailable'))
+  return conversation.send(text)
 }
 
 /** Services required by the browser half. */
@@ -105,8 +102,8 @@ export function apply(ctx: ClientContext): void {
         updateQueue: (itemId, action) => conversation.updateQueue(itemId, action),
         cancel: () => conversation.cancel(),
         send: (text) => conversation.send(text),
-        // safe_point 恢复经 steer-mode prompt 投递到 next-step（feature 分支同款）。
-        sendSteer: (text) => steerPrompt(ctx, actx, text),
+        // safe_point 恢复经 conversation.send 排队到下一轮（本版契约无 steer prompt 面）。
+        sendSteer: (text) => steerPrompt(actx, text),
         sessionId: String(sessionId),
         setDraft: (text) => { conversation.input.for(actx).actions.setDraft(text) },
         notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
