@@ -12,4 +12,7 @@
 export declare function sessionGuardStopNextTurn(sessionId: string): Promise<boolean>;
 /** 尽力调用 sessionGuard.resume。失败静默。 */
 export declare function sessionGuardResume(sessionId: string): Promise<boolean>;
+declare global {
+    var __DSH_SESSION_GUARD_BRIDGE__: boolean | undefined;
+}
 //# sourceMappingURL=session-guard-bridge.d.ts.map
