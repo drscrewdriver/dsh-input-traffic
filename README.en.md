@@ -70,8 +70,21 @@ The "Freeze session / Resume session" button on the composer's right (beside the
 
 - **Freeze**: the current turn is **not interrupted** — it finishes naturally, then consumption pauses. The queue is fully **decoupled from freezing**: freezing only stops the agent from consuming (executing / inserting / appending), while the waiting area stays visible and **fully operable** — reorder, edit, remove and set the red/yellow/green insertion tier, just like when not frozen;
 - **Resume**: the (possibly edited) queue is re-submitted and **each entry executes with its planned tier** (red = interrupt and process immediately, yellow = interject, green = queue); the agent continues in FIFO order;
-- Engine: freeze = detach every queued row via `updateQueue(remove)` (copies with their tiers kept in the plugin store); the driver stops naturally once the current turn ends with no pending work; edits made while frozen (text / order / tier) write back to the store in real time; resume = re-submit via `send(text)`, waking the driver (red-tier entries are preceded by `cancel()`);
+- **Session isolation**: freeze state and the detached queue are keyed **by sessionId** (`src/client/freeze-store.ts`'s `Map<string, FreezeState>`) — freezing session A never affects session B's banner/button/queue; editing only re-renders the owning session's consumers;
+- **Engine**: freeze = detach every queued row via `updateQueue(remove)` (copies with their tiers kept in the plugin store, keyed by session); the driver stops naturally once the current turn ends with no pending work; edits made while frozen (text / order / tier) write back to the store in real time; resume = first `await sessionGuard.resume(sessionId)` (so the interrupted turn's natural next step happens first), then re-submit via `send(text)`, waking the driver (red-tier entries are preceded by `cancel()`);
 - Note: queued messages containing non-text content (images) cannot be re-sent and are released by the freeze (they do not come back).
+
+### Session-level locking via dsh-session-guard
+
+The freeze button hands off to a **sessionGuard bridge** (`src/client/session-guard-bridge.ts` → `POST /session-guard/rpc { action: stopNextTurn|resume, sessionId }`) for **per-session locking** on the server side, while raising a composer block (`conversation.blocks.set`) so the input box turns inert and Enter can no longer leak into the conversation:
+
+- **Component references**:
+  - `src/client/freeze-button.tsx` — freeze/resume control (slot `conversation.input.right`);
+  - `src/client/steer-queue-dock.tsx` — three-tier planning dock + frozen banner/list (slot `conversation.input.dock` id `queue`);
+  - `src/client/freeze-store.ts` — session-scoped freeze state (`Map<sessionId, {frozen, pending}>`, shared by button ↔ dock);
+  - `src/client/session-guard-bridge.ts` — session-guard RPC bridge (fail-open, silently skipped when session-guard is absent);
+  - `src/client/index.ts` — slot registration + composer-block injection (`conversation.blocks.set`).
+- **Scope comparison**: this plugin's freeze button = **per-session** (locks that one session by id); session-guard's **auto peak gate = global** (pauses all running sessions on peak entry, resumes all on exit). They complement each other — the gate handles the global case, the button the single-session case.
 
 ## Queue management
 
@@ -190,7 +203,7 @@ Expected — the plugin hides it and pins Enter to green queue; a stale preferen
 
 ### Queued messages disappeared after freezing
 
-Expected — the freeze detaches the queue into the plugin store (removed from the waiting area); they return on resume. Refreshing the page loses the frozen queue; avoid refreshing while frozen.
+Expected — the freeze detaches the queue into the plugin store (keyed by session, removed from the waiting area); they return on resume. Refreshing the page loses the frozen queue; avoid refreshing while frozen.
 
 ### Move up/down is disabled
 
@@ -226,7 +239,7 @@ src/
     ├── index.ts              # browser half apply: busyEnter pinned to queue + three slot registrations
     ├── steer-queue-dock.tsx  # three-tier planning dock (shadows conversation.input.dock id queue)
     ├── freeze-button.tsx     # freeze/resume button (conversation.input.right)
-    ├── freeze-store.ts       # shared freeze state (composer button ↔ dock banner)
+    ├── freeze-store.ts       # session-scoped freeze state (Map<sessionId, {frozen, pending}>)
     ├── hide-enter-row.tsx    # settings-row hiding (shadows settings.general.item id composer-enter)
     ├── locales.ts            # steer dictionaries (zh/en)
     └── *.module.css
@@ -263,6 +276,7 @@ This project is one of the DSH plugins maintained by [drscrewdriver](https://git
 | Plugin | One-liner |
 |---|---|
 | **[dsh-input-traffic](https://github.com/drscrewdriver/dsh-input-traffic)** | Busy-time input queue: three-tier traffic control, drag-to-reorder, session freeze |
+| **[dsh-session-guard](https://github.com/drscrewdriver/dsh-session-guard)** | Peak auto session gate: weekend mode + peak auto-pause + session-level lock + backend auto-retry (pairs with this plugin's button) |
 | [dsh-thinking-levels](https://github.com/drscrewdriver/dsh-thinking-levels) | Per-round reasoning_effort control: Auto scheduling or manual wire level |
 | [dsh-seatbelt-sandbox](https://github.com/drscrewdriver/dsh-seatbelt-sandbox) | macOS Seatbelt sandbox adapter: native libsandbox loader replacing deprecated sandbox-exec |
 | [dsh-switch-search](https://github.com/drscrewdriver/dsh-switch-search) | Session content search sidebar: title/content toggle, type-filter by user/reply/tool |
