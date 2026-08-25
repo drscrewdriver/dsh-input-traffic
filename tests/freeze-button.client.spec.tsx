@@ -20,6 +20,7 @@ function mount(snap: ConversationSnapshot) {
   const send = vi.fn().mockResolvedValue(undefined)
   const sendSteer = vi.fn().mockResolvedValue(undefined)
   const notify = vi.fn()
+  const setComposerBlock = vi.fn()
   const t = vi.fn((key: string) => key)
   const props = {
     session: snap,
@@ -28,11 +29,12 @@ function mount(snap: ConversationSnapshot) {
     send,
     sendSteer,
     sessionId: 's1',
+    setComposerBlock,
     notify,
     t,
   } as unknown as FreezeButtonProps
   const view = render(<FreezeButton {...props} />)
-  return { view, updateQueue, cancel, send, sendSteer, notify, t }
+  return { view, updateQueue, cancel, send, sendSteer, setComposerBlock, notify, t }
 }
 
 beforeEach(() => {
@@ -160,6 +162,41 @@ describe('FreezeButton', () => {
     expect(send).toHaveBeenNthCalledWith(1, '急事')
     expect(send).toHaveBeenNthCalledWith(2, '排队')
     expect(freezeStore.getSnapshot()).toEqual({ frozen: false, pending: [] })
+  })
+
+  it('freeze raises the composer block so Enter cannot leak into the conversation', async () => {
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
+    ]
+    const { setComposerBlock } = mount(snapshot(rows))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    // Frozen: the composer is inert (blocked), so plain Enter is swallowed by
+    // the bar instead of sending/queueing into the conversation.
+    expect(setComposerBlock).toHaveBeenCalledWith(expect.any(String))
+  })
+
+  it('resume clears the composer block and awaits session-guard resume BEFORE re-submitting', async () => {
+    const calls: string[] = []
+    const fetchMock = vi.fn().mockImplementation(async (_url: unknown, init?: { body?: string }) => {
+      calls.push(`fetch:${String(init?.body ?? '').includes('resume') ? 'resume' : 'other'}`)
+      return { ok: true, json: async () => ({ ok: true }) }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { send, setComposerBlock } = mount(snapshot([]))
+    send.mockImplementation(async () => { calls.push('send') })
+    await act(async () => {
+      freezeStore.set({ frozen: true, pending: [{ text: '排队', tier: 'queue' }] })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.resume' }))
+    })
+    // 恢复先续跑（session-guard resume RPC），再重投 —— later 级条目排在
+    // 自然 next turn 之后，不会在 idle 态立即唤醒新回合抢跑。
+    expect(calls[0]).toBe('fetch:resume')
+    expect(calls.indexOf('send')).toBeGreaterThan(calls.indexOf('fetch:resume'))
+    expect(setComposerBlock).toHaveBeenCalledWith(undefined)
   })
 
   it('fail-open (D8): session-guard 未装/不可达时冻结仍完成且不报错', async () => {

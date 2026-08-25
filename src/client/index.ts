@@ -107,6 +107,11 @@ export function apply(ctx: ClientContext): void {
         sessionId: String(sessionId),
         setDraft: (text) => { conversation.input.for(actx).actions.setDraft(text) },
         notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
+        // 冻结期间 raise composer block：composer 变 inert（回车/发送按钮全部失效），
+        // 输入不会漏进对话；恢复时清除。block 不锁 input.right（恢复按钮仍可点）。
+        setComposerBlock: (reason) => {
+          conversation.blocks.set(sessionId, reason === undefined ? undefined : { reason })
+        },
       }
     },
   }, FreezeButton))

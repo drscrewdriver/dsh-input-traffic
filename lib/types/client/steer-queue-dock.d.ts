@@ -25,6 +25,10 @@ export interface SteerQueueDockInjected {
     notify: (level: 'info' | 'error', text: string) => void;
     /** Owning session id (for the dsh-session-guard bridge RPC). */
     sessionId?: string;
+    /** Raise/clear the composer block for the owning session (freeze keeps the
+     *  composer inert so Enter cannot leak into the conversation; absent on the
+     *  dock entry, only the freeze button injects it). */
+    setComposerBlock?: (reason: string | undefined) => void;
 }
 /** Full props of a dock entry: InputZone owner share + session standard kit + global seat + the locale seat. */
 export type SteerQueueDockProps = PropsRuntime<'conversation.input.dock'> & SteerQueueDockInjected & PropsLocale<'steer'>;

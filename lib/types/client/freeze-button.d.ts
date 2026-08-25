@@ -6,5 +6,5 @@ export type FreezeButtonProps = PropsRuntime<'conversation.input.right'> & Steer
  * Freeze/resume toggle for the peak-hour scenario.
  * @param props - slot props; the session snapshot drives the detach list.
  */
-export declare function FreezeButton({ session, updateQueue, cancel, send, sendSteer, sessionId, notify, t }: FreezeButtonProps): import("react").JSX.Element;
+export declare function FreezeButton({ session, updateQueue, cancel, send, sendSteer, sessionId, setComposerBlock, notify, t }: FreezeButtonProps): import("react").JSX.Element;
 //# sourceMappingURL=freeze-button.d.ts.map

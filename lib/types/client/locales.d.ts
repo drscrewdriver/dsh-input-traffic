@@ -48,6 +48,7 @@ export declare const zh: {
     'steer.freeze': string;
     'steer.resume': string;
     'steer.frozen': string;
+    'steer.frozenInput': string;
     'steer.frozenBadge': string;
     'steer.freezeFailed': string;
     'steer.resumeFailed': string;

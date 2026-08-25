@@ -145,5 +145,9 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
         actions: { setDraft(text: string): void }
       }
     }
+    /** Composer-block registry: raise/clear a per-session inert composer. */
+    blocks: {
+      set(sessionId: string, block: { reason: string } | undefined): void
+    }
   }
 }
