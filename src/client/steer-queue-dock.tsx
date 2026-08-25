@@ -55,9 +55,13 @@ export interface SteerQueueDockInjected {
   cancel: () => Promise<void>
   /** Re-send one plain-text message as a queued follow-up (the revoke path). */
   send: (text: string) => Promise<void>
+  /** Steer one plain-text message into the session's next step (resume's safe_point tier). */
+  sendSteer?: (text: string) => Promise<void>
   /** Back-fill the composer draft (the pull-back-to-composer edit path). */
   setDraft: (text: string) => void
   notify: (level: 'info' | 'error', text: string) => void
+  /** Owning session id (for the dsh-session-guard bridge RPC). */
+  sessionId?: string
 }
 
 /** Full props of a dock entry: InputZone owner share + session standard kit + global seat + the locale seat. */

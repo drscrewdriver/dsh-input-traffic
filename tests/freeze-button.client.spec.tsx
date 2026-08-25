@@ -18,6 +18,7 @@ function mount(snap: ConversationSnapshot) {
   const updateQueue = vi.fn().mockResolvedValue(undefined)
   const cancel = vi.fn().mockResolvedValue(undefined)
   const send = vi.fn().mockResolvedValue(undefined)
+  const sendSteer = vi.fn().mockResolvedValue(undefined)
   const notify = vi.fn()
   const t = vi.fn((key: string) => key)
   const props = {
@@ -25,15 +26,23 @@ function mount(snap: ConversationSnapshot) {
     updateQueue,
     cancel,
     send,
+    sendSteer,
+    sessionId: 's1',
     notify,
     t,
   } as unknown as FreezeButtonProps
   const view = render(<FreezeButton {...props} />)
-  return { view, updateQueue, cancel, send, notify, t }
+  return { view, updateQueue, cancel, send, sendSteer, notify, t }
 }
 
 beforeEach(() => {
   resetFreezeStore()
+  // 默认让 sessionGuard 桥不可达（fail-open 路径）：jsdom 无 fetch 或路由 404。
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('FreezeButton', () => {
@@ -111,5 +120,86 @@ describe('FreezeButton', () => {
     // The claimed row is dropped silently; the freeze still completes.
     expect(freezeStore.getSnapshot().frozen).toBe(true)
     expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('freeze detaches already-steered (next-step) rows as a safe_point plan', async () => {
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
+      { id: 's1', messageId: 's1', placement: 'steering' as const, preview: '插话', text: '插话', content: [] },
+    ]
+    const { updateQueue } = mount(snapshot(rows))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    // The next-step row is detached too — nothing stays in the live queue
+    // while frozen — and keeps its next intent as a safe_point tier.
+    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
+    expect(updateQueue).toHaveBeenCalledWith('s1', { kind: 'remove' })
+    expect(freezeStore.getSnapshot()).toEqual({
+      frozen: true,
+      pending: [{ text: 'a', tier: 'queue' }, { text: '插话', tier: 'safe_point' }],
+    })
+  })
+
+  it('resume re-steers safe_point (yellow) entries into the next step', async () => {
+    const { cancel, send, sendSteer } = mount(snapshot([]))
+    await act(async () => {
+      freezeStore.set({ frozen: true, pending: [
+        { text: '急事', tier: 'force' },
+        { text: '插话', tier: 'safe_point' },
+        { text: '排队', tier: 'queue' },
+      ] })
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.resume' }))
+    })
+    expect(cancel).toHaveBeenCalled()
+    // The yellow entry is steered (next-step), not re-queued as later.
+    expect(sendSteer).toHaveBeenCalledWith('插话')
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send).toHaveBeenNthCalledWith(1, '急事')
+    expect(send).toHaveBeenNthCalledWith(2, '排队')
+    expect(freezeStore.getSnapshot()).toEqual({ frozen: false, pending: [] })
+  })
+
+  it('fail-open (D8): session-guard 未装/不可达时冻结仍完成且不报错', async () => {
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
+    ]
+    const { updateQueue, notify } = mount(snapshot(rows))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    // 桥调用失败被静默吞掉：前端冻结照常完成，无任何错误提示。
+    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
+    expect(freezeStore.getSnapshot().frozen).toBe(true)
+    expect(notify).not.toHaveBeenCalled()
+    // resume 同样 fail-open。
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.resume' }))
+    })
+    expect(freezeStore.getSnapshot().frozen).toBe(false)
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  it('bridge 可达时冻结/解冻会调 sessionGuard RPC', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) })
+    vi.stubGlobal('fetch', fetchMock)
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
+    ]
+    const { updateQueue } = mount(snapshot(rows))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    // 冻结调 stopNextTurn
+    const stopCall = fetchMock.mock.calls.find(c => String(c[1].body).includes('stopNextTurn'))
+    expect(stopCall).toBeTruthy()
+    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.resume' }))
+    })
+    const resumeCall = fetchMock.mock.calls.find(c => String(c[1].body).includes('resume'))
+    expect(resumeCall).toBeTruthy()
   })
 })
