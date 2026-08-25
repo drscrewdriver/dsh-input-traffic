@@ -114,7 +114,7 @@ export function resizeEditor(el: HTMLTextAreaElement): void {
  * Queue strip with three-tier planning: one item renders directly; multiple
  * items default to a collapsible count header; an empty queue renders nothing.
  */
-export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, setDraft, notify, t }: SteerQueueDockProps) {
+export function SteerQueueDock({ sessionId, useSession, input, updateQueue, cancel, send, setDraft, notify, t }: SteerQueueDockProps) {
   const inbox = useSession(s => s.queue)
   const queue = useMemo(() => inbox.filter(row => row.placement === 'queued'), [inbox])
   const steering = useMemo(() => inbox.filter(row => row.placement === 'steering'), [inbox])
@@ -144,7 +144,11 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
   // detached queue is rendered here (read-only) so the waiting area stays
   // visible — freezing only pauses the running behavior, it must not hide
   // the queued messages.
-  const { frozen, pending: frozenPending } = useSyncExternalStore(freezeStore.subscribe, freezeStore.getSnapshot)
+  const { frozen, pending: frozenPending } = useSyncExternalStore(
+    freezeStore.subscribe,
+    () => freezeStore.getSnapshot(sessionId ?? ''),
+  )
+  const sid = sessionId ?? ''
   const listId = useId()
   // The edit textarea; grown to its content on entry and on every input.
   const editorRef = useRef<HTMLTextAreaElement>(null)
@@ -373,7 +377,7 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
       setEditing(null)
       return
     }
-    updatePendingAt(index, text)
+    updatePendingAt(sid, index, text)
     setEditing(null)
   }
 
@@ -500,7 +504,7 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
                     const from = dragIndex.current
                     dragIndex.current = null
                     setDragOver(null)
-                    if (from !== null) movePending(from, i)
+                    if (from !== null) movePending(sid, from, i)
                   }}
                   onDragEnd={() => {
                     dragIndex.current = null
@@ -566,7 +570,7 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
                             className={css.action}
                             aria-label={t('steer.moveUp')}
                             disabled={i === 0}
-                            onClick={() => movePending(i, i - 1)}
+                            onClick={() => movePending(sid, i, i - 1)}
                           >
                             <IconChevronUpOutline14 />
                           </button>
@@ -577,7 +581,7 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
                             className={css.action}
                             aria-label={t('steer.moveDown')}
                             disabled={i === frozenPending.length - 1}
-                            onClick={() => movePending(i, i + 1)}
+                            onClick={() => movePending(sid, i, i + 1)}
                           >
                             <IconChevronDownOutline14 />
                           </button>
@@ -597,7 +601,7 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
                             type="button"
                             className={css.action}
                             aria-label={t('queue.remove')}
-                            onClick={() => removePendingAt(i)}
+                            onClick={() => removePendingAt(sid, i)}
                           >
                             <IconTrashOutline16 size={14} />
                           </button>
@@ -611,7 +615,7 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
                               className={`${css.tier} ${css.tierNow}`}
                               aria-label={t('steer.now')}
                               aria-pressed={entry.tier === 'force' || undefined}
-                              onClick={() => setTierAt(i, 'force')}
+                              onClick={() => setTierAt(sid, i, 'force')}
                             >
                               <span className={css.dot} aria-hidden />
                             </button>
@@ -622,7 +626,7 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
                               className={`${css.tier} ${css.tierNext}`}
                               aria-label={t('steer.next')}
                               aria-pressed={entry.tier === 'safe_point' || undefined}
-                              onClick={() => setTierAt(i, 'safe_point')}
+                              onClick={() => setTierAt(sid, i, 'safe_point')}
                             >
                               <span className={css.dot} aria-hidden />
                             </button>
@@ -633,7 +637,7 @@ export function SteerQueueDock({ useSession, input, updateQueue, cancel, send, s
                               className={`${css.tier} ${css.tierLater}`}
                               aria-label={t('steer.later')}
                               aria-pressed={entry.tier === 'queue' || undefined}
-                              onClick={() => setTierAt(i, 'queue')}
+                              onClick={() => setTierAt(sid, i, 'queue')}
                             >
                               <span className={css.dot} aria-hidden />
                             </button>

@@ -1,12 +1,17 @@
 /**
- * Session-freeze store shared by the composer freeze button (the control)
- * and the steering dock (the banner/disabled states).
+ * Session-scoped freeze store shared by the composer freeze button (the
+ * control) and the steering dock (the banner/disabled states).
  *
  * The queue is fully decoupled from freezing: freezing only stops the agent
  * from consuming the queue (the detached entries are preserved here so the
  * driver finds no pending work and stops). While frozen the entries stay
  * fully editable — text, order and the planned insertion tier (now/next/
  * later) can all change; resume re-submits the queue honoring those tiers.
+ *
+ * State is keyed by session id so freezing one session never leaks into
+ * another: each session holds its own `frozen` flag and detached queue, and
+ * mutating one session's queue only re-renders that session's consumers
+ * (`useSyncExternalStore` bails on unchanged references for the others).
  */
 /** Insertion tier planned for one detached queued message. */
 export type FrozenTier = 'queue' | 'safe_point' | 'force';
@@ -22,20 +27,22 @@ export interface FreezeState {
 }
 /** Minimal snapshot store (no runtime dependency, stable identity per mount). */
 export declare const freezeStore: {
-    getSnapshot(): FreezeState;
+    /** Snapshot for one session; reference-stable until that session changes. */
+    getSnapshot(sessionId: string): FreezeState;
     subscribe(listener: () => void): () => void;
-    set(next: FreezeState): void;
+    /** Replace one session's state; unset sessions fall back to EMPTY. */
+    set(sessionId: string, next: FreezeState): void;
 };
-/** Reset for tests. */
+/** Reset all sessions (for tests). */
 export declare function resetFreezeStore(): void;
 /** Append one queued message while frozen (new input lands in the detached queue). */
-export declare function pushPending(text: string, tier?: FrozenTier): void;
+export declare function pushPending(sessionId: string, text: string, tier?: FrozenTier): void;
 /** Edit one detached queued message's text in place. */
-export declare function updatePendingAt(index: number, text: string): void;
+export declare function updatePendingAt(sessionId: string, index: number, text: string): void;
 /** Change one detached queued message's planned insertion tier. */
-export declare function setTierAt(index: number, tier: FrozenTier): void;
+export declare function setTierAt(sessionId: string, index: number, tier: FrozenTier): void;
 /** Remove one detached queued message. */
-export declare function removePendingAt(index: number): void;
+export declare function removePendingAt(sessionId: string, index: number): void;
 /** Move one detached queued message to a new position (reorder while frozen). */
-export declare function movePending(from: number, to: number): void;
+export declare function movePending(sessionId: string, from: number, to: number): void;
 //# sourceMappingURL=freeze-store.d.ts.map

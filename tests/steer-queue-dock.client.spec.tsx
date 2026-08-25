@@ -31,6 +31,7 @@ function mount(snap: ConversationSnapshot, draft = '') {
   })
   const props = {
     useSession: <T,>(selector: (s: ConversationSnapshot) => T): T => selector(snap),
+    sessionId: 's1' as string,
     input: { draft, phase: 'plain' as const, queue: snap.queue },
     updateQueue,
     cancel,
@@ -338,7 +339,7 @@ describe('SteerQueueDock', () => {
   })
 
   it('shows the frozen banner while the detached queue stays interactive', () => {
-    freezeStore.set({ frozen: true, pending: [{ text: 'keep me', tier: 'queue' }] })
+    freezeStore.set('s1', { frozen: true, pending: [{ text: 'keep me', tier: 'queue' }] })
     try {
       mount(snapshot([]))
       expect(screen.getByText('steer.frozen')).toBeTruthy()
@@ -346,7 +347,7 @@ describe('SteerQueueDock', () => {
       const nowBtn = screen.getByRole('button', { name: 'steer.now' })
       expect(nowBtn.hasAttribute('disabled')).toBe(false)
       fireEvent.click(nowBtn)
-      expect(freezeStore.getSnapshot().pending[0]?.tier).toBe('force')
+      expect(freezeStore.getSnapshot('s1').pending[0]?.tier).toBe('force')
     } finally {
       resetFreezeStore()
     }
@@ -395,7 +396,7 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
   })
 
   it('frozen session keeps the waiting area visible with the detached queue editable', () => {
-    freezeStore.set({ frozen: true, pending: [{ text: '排队一', tier: 'queue' }, { text: '排队二', tier: 'safe_point' }] })
+    freezeStore.set('s1', { frozen: true, pending: [{ text: '排队一', tier: 'queue' }, { text: '排队二', tier: 'safe_point' }] })
     // After freeze the dsh queue is empty and the agent is idle, but the dock
     // must stay mounted and render the detached queue from the freeze store.
     const { view } = mount(snapshot([], { running: false }))
@@ -416,42 +417,42 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
   })
 
   it('frozen queue rows can be reordered and removed', () => {
-    freezeStore.set({ frozen: true, pending: [{ text: '甲', tier: 'queue' }, { text: '乙', tier: 'queue' }, { text: '丙', tier: 'queue' }] })
+    freezeStore.set('s1', { frozen: true, pending: [{ text: '甲', tier: 'queue' }, { text: '乙', tier: 'queue' }, { text: '丙', tier: 'queue' }] })
     mount(snapshot([], { running: false }))
     // Move the last row (丙) up once: 甲, 丙, 乙.
     fireEvent.click(screen.getAllByRole('button', { name: 'steer.moveUp' })[2] as Element)
-    expect(freezeStore.getSnapshot().pending.map(e => e.text)).toEqual(['甲', '丙', '乙'])
+    expect(freezeStore.getSnapshot('s1').pending.map(e => e.text)).toEqual(['甲', '丙', '乙'])
     // Remove 丙: 甲, 乙.
     fireEvent.click(screen.getAllByRole('button', { name: 'queue.remove' })[1] as Element)
-    expect(freezeStore.getSnapshot().pending.map(e => e.text)).toEqual(['甲', '乙'])
+    expect(freezeStore.getSnapshot('s1').pending.map(e => e.text)).toEqual(['甲', '乙'])
   })
 
   it('frozen queue rows can be edited in place', () => {
-    freezeStore.set({ frozen: true, pending: [{ text: '原文', tier: 'queue' }] })
+    freezeStore.set('s1', { frozen: true, pending: [{ text: '原文', tier: 'queue' }] })
     mount(snapshot([], { running: false }))
     fireEvent.click(screen.getByRole('button', { name: 'queue.edit' }))
     const editor = screen.getByRole('textbox') as HTMLTextAreaElement
     fireEvent.change(editor, { target: { value: '改后' } })
     fireEvent.click(screen.getByRole('button', { name: 'queue.save' }))
-    expect(freezeStore.getSnapshot().pending).toEqual([{ text: '改后', tier: 'queue' }])
+    expect(freezeStore.getSnapshot('s1').pending).toEqual([{ text: '改后', tier: 'queue' }])
   })
 
   it('frozen queue rows can change the planned insertion tier (red/yellow/green)', () => {
-    freezeStore.set({ frozen: true, pending: [{ text: '待规划', tier: 'queue' }] })
+    freezeStore.set('s1', { frozen: true, pending: [{ text: '待规划', tier: 'queue' }] })
     mount(snapshot([], { running: false }))
     // Red: force interrupt on resume.
     fireEvent.click(screen.getByRole('button', { name: 'steer.now' }))
-    expect(freezeStore.getSnapshot().pending[0]?.tier).toBe('force')
+    expect(freezeStore.getSnapshot('s1').pending[0]?.tier).toBe('force')
     // Yellow: safe_point.
     fireEvent.click(screen.getByRole('button', { name: 'steer.next' }))
-    expect(freezeStore.getSnapshot().pending[0]?.tier).toBe('safe_point')
+    expect(freezeStore.getSnapshot('s1').pending[0]?.tier).toBe('safe_point')
     // Green: queue (default).
     fireEvent.click(screen.getByRole('button', { name: 'steer.later' }))
-    expect(freezeStore.getSnapshot().pending[0]?.tier).toBe('queue')
+    expect(freezeStore.getSnapshot('s1').pending[0]?.tier).toBe('queue')
   })
 
   it('frozen queue rows support drag-to-reorder like the live queue', () => {
-    freezeStore.set({ frozen: true, pending: [{ text: '甲', tier: 'queue' }, { text: '乙', tier: 'queue' }, { text: '丙', tier: 'queue' }] })
+    freezeStore.set('s1', { frozen: true, pending: [{ text: '甲', tier: 'queue' }, { text: '乙', tier: 'queue' }, { text: '丙', tier: 'queue' }] })
     const { view } = mount(snapshot([], { running: false }))
     const items = view.container.querySelectorAll('[data-testid="frozen-list"] li')
     expect(items).toHaveLength(3)
@@ -460,7 +461,7 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
     fireEvent.dragStart(items[2] as Element, { dataTransfer })
     fireEvent.dragOver(items[0] as Element, { dataTransfer, preventDefault: vi.fn() })
     fireEvent.drop(items[0] as Element, { dataTransfer, preventDefault: vi.fn() })
-    expect(freezeStore.getSnapshot().pending.map(e => e.text)).toEqual(['丙', '甲', '乙'])
+    expect(freezeStore.getSnapshot('s1').pending.map(e => e.text)).toEqual(['丙', '甲', '乙'])
   })
 
   it('clear requires a second confirm click before executing', async () => {

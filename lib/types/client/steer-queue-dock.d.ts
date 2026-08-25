@@ -63,5 +63,5 @@ export declare function resizeEditor(el: HTMLTextAreaElement): void;
  * Queue strip with three-tier planning: one item renders directly; multiple
  * items default to a collapsible count header; an empty queue renders nothing.
  */
-export declare function SteerQueueDock({ useSession, input, updateQueue, cancel, send, setDraft, notify, t }: SteerQueueDockProps): import("react").JSX.Element | null;
+export declare function SteerQueueDock({ sessionId, useSession, input, updateQueue, cancel, send, setDraft, notify, t }: SteerQueueDockProps): import("react").JSX.Element | null;
 //# sourceMappingURL=steer-queue-dock.d.ts.map

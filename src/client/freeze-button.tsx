@@ -32,7 +32,9 @@ export type FreezeButtonProps = PropsRuntime<'conversation.input.right'> & Steer
  * @param props - slot props; the session snapshot drives the detach list.
  */
 export function FreezeButton({ session, updateQueue, cancel, send, sendSteer, sessionId, setComposerBlock, notify, t }: FreezeButtonProps) {
-  const { frozen } = useSyncExternalStore(freezeStore.subscribe, freezeStore.getSnapshot)
+  // The freeze store is keyed by session: read the owning session's snapshot.
+  const sid = sessionId ?? ''
+  const { frozen } = useSyncExternalStore(freezeStore.subscribe, () => freezeStore.getSnapshot(sid))
 
   const freeze = async (): Promise<void> => {
     // Detach every pending input row — queued (next-turn) and already-steered
@@ -49,7 +51,7 @@ export function FreezeButton({ session, updateQueue, cancel, send, sendSteer, se
     await Promise.all(rows.map(row =>
       updateQueue(row.id, { kind: 'remove' }).catch(() => undefined),
     ))
-    freezeStore.set({ frozen: true, pending })
+    freezeStore.set(sid, { frozen: true, pending })
     // Raise the composer block: while frozen the composer is inert, so plain
     // Enter can never leak a new message into the conversation (busyEnter
     // only gates busy sessions; an idle/paused session would send directly).
@@ -59,8 +61,8 @@ export function FreezeButton({ session, updateQueue, cancel, send, sendSteer, se
   }
 
   const resume = async (): Promise<void> => {
-    const pending = freezeStore.getSnapshot().pending
-    freezeStore.set({ frozen: false, pending: [] })
+    const pending = freezeStore.getSnapshot(sid).pending
+    freezeStore.set(sid, { frozen: false, pending: [] })
     setComposerBlock?.(undefined)
     try {
       // 先恢复服务端会话：被打断回合的自然下一步（deferredTools 续跑）先发生。

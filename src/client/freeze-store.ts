@@ -1,12 +1,17 @@
 /**
- * Session-freeze store shared by the composer freeze button (the control)
- * and the steering dock (the banner/disabled states).
+ * Session-scoped freeze store shared by the composer freeze button (the
+ * control) and the steering dock (the banner/disabled states).
  *
  * The queue is fully decoupled from freezing: freezing only stops the agent
  * from consuming the queue (the detached entries are preserved here so the
  * driver finds no pending work and stops). While frozen the entries stay
  * fully editable — text, order and the planned insertion tier (now/next/
  * later) can all change; resume re-submits the queue honoring those tiers.
+ *
+ * State is keyed by session id so freezing one session never leaks into
+ * another: each session holds its own `frozen` flag and detached queue, and
+ * mutating one session's queue only re-renders that session's consumers
+ * (`useSyncExternalStore` bails on unchanged references for the others).
  */
 
 /** Insertion tier planned for one detached queued message. */
@@ -24,74 +29,86 @@ export interface FreezeState {
   pending: readonly FrozenEntry[]
 }
 
+/** Session id → per-session freeze state. */
+const states = new Map<string, FreezeState>()
 const listeners = new Set<() => void>()
-let state: FreezeState = { frozen: false, pending: [] }
+
+/** Stable empty snapshot: `useSyncExternalStore` needs a reference-stable
+ *  value for unset sessions so unchanged consumers never re-render. */
+const EMPTY: FreezeState = { frozen: false, pending: [] }
 
 /** Minimal snapshot store (no runtime dependency, stable identity per mount). */
 export const freezeStore = {
-  getSnapshot(): FreezeState {
-    return state
+  /** Snapshot for one session; reference-stable until that session changes. */
+  getSnapshot(sessionId: string): FreezeState {
+    return states.get(sessionId) ?? EMPTY
   },
   subscribe(listener: () => void): () => void {
     listeners.add(listener)
     return () => { listeners.delete(listener) }
   },
-  set(next: FreezeState): void {
-    state = next
-    for (const listener of listeners) listener()
+  /** Replace one session's state; unset sessions fall back to EMPTY. */
+  set(sessionId: string, next: FreezeState): void {
+    if (next.frozen === false && next.pending.length === 0) {
+      states.delete(sessionId)
+    } else {
+      states.set(sessionId, next)
+    }
+    emit()
   },
 }
 
-/** Reset for tests. */
+/** Reset all sessions (for tests). */
 export function resetFreezeStore(): void {
-  state = { frozen: false, pending: [] }
-  for (const listener of listeners) listener()
+  states.clear()
+  emit()
 }
 
 /** Append one queued message while frozen (new input lands in the detached queue). */
-export function pushPending(text: string, tier: FrozenTier = 'queue'): void {
-  state = { ...state, pending: [...state.pending, { text, tier }] }
-  emit()
+export function pushPending(sessionId: string, text: string, tier: FrozenTier = 'queue'): void {
+  const cur = states.get(sessionId) ?? EMPTY
+  freezeStore.set(sessionId, { ...cur, pending: [...cur.pending, { text, tier }] })
 }
 
 /** Edit one detached queued message's text in place. */
-export function updatePendingAt(index: number, text: string): void {
-  const pending = [...state.pending]
-  if (index < 0 || index >= pending.length) return
+export function updatePendingAt(sessionId: string, index: number, text: string): void {
+  const pending = states.get(sessionId)?.pending
+  if (pending === undefined) return
   const entry = pending[index]
   if (entry === undefined) return
-  pending[index] = { ...entry, text }
-  state = { ...state, pending }
-  emit()
+  const next = [...pending]
+  next[index] = { ...entry, text }
+  freezeStore.set(sessionId, { frozen: true, pending: next })
 }
 
 /** Change one detached queued message's planned insertion tier. */
-export function setTierAt(index: number, tier: FrozenTier): void {
-  const pending = [...state.pending]
-  if (index < 0 || index >= pending.length) return
+export function setTierAt(sessionId: string, index: number, tier: FrozenTier): void {
+  const pending = states.get(sessionId)?.pending
+  if (pending === undefined) return
   const entry = pending[index]
   if (entry === undefined) return
-  pending[index] = { ...entry, tier }
-  state = { ...state, pending }
-  emit()
+  const next = [...pending]
+  next[index] = { ...entry, tier }
+  freezeStore.set(sessionId, { frozen: true, pending: next })
 }
 
 /** Remove one detached queued message. */
-export function removePendingAt(index: number): void {
-  if (index < 0 || index >= state.pending.length) return
-  state = { ...state, pending: state.pending.filter((_, i) => i !== index) }
-  emit()
+export function removePendingAt(sessionId: string, index: number): void {
+  const pending = states.get(sessionId)?.pending
+  if (pending === undefined) return
+  freezeStore.set(sessionId, { frozen: true, pending: pending.filter((_, i) => i !== index) })
 }
 
 /** Move one detached queued message to a new position (reorder while frozen). */
-export function movePending(from: number, to: number): void {
+export function movePending(sessionId: string, from: number, to: number): void {
   if (from === to) return
-  const pending = [...state.pending]
-  const [moved] = pending.splice(from, 1)
+  const pending = states.get(sessionId)?.pending
+  if (pending === undefined) return
+  const next = [...pending]
+  const [moved] = next.splice(from, 1)
   if (moved === undefined) return
-  pending.splice(to, 0, moved)
-  state = { ...state, pending }
-  emit()
+  next.splice(to, 0, moved)
+  freezeStore.set(sessionId, { frozen: true, pending: next })
 }
 
 function emit(): void {
