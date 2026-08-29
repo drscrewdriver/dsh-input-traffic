@@ -23,7 +23,17 @@
   "files": [
     "lib/",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "README.en.md",
+    "README.ja.md",
+    "README.ko.md",
+    "INSTALL.md",
+    "INSTALL.zh.md",
+    "INSTALL.ja.md",
+    "INSTALL.ko.md",
+    "CHANGELOG.md",
+    "CHANGELOG.ja.md",
+    "CHANGELOG.ko.md"
   ],
   "dsh": {
     "bundle": {
