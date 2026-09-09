@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+### 变更：冻结按钮文案与 session-guard 的分工说明
+
+- **按钮文案**：`steer.freeze` →「冻结追加」（Freeze & append / 凍結して追加 / 동결 후 추가），
+  `steer.resume` →「恢复追加」（Resume & append / 再開して追加 / 재개 후 추가）——与 session-guard 新增的
+  「暂停会话 / 继续会话」按钮并列，避免两个「恢复」混淆。只改文案，行为不变。
+- **职责边界**（README 新增小节）：本插件只负责「排」——决定用户输入进 `next-step` 还是 `next-turn`、
+  什么档位、何时被消费（`updateQueue(steer|remove|edit)` / `send` / `cancel`）；session-guard 只负责「停」——
+  `agent/pre-step` step 门、回合级暂停、请求级 hold。`next-step` 的物理含义是「与工具返回同级的下一步
+  （同一 turn 内）」，`next-turn` 才是新回合。
+
 ### 新增：DSH 双版本兼容（0.1.1-rc.2 / 0.1.2-rc.1）
 
 - **单一产物，运行时自适应**：同一份 `lib/client.js` 在两个版本都能加载，无版本号字符串分支。

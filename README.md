@@ -123,7 +123,18 @@
   - `src/client/freeze-store.ts` — 会话级冻结状态 store（`Map<sessionId, {frozen, pending}>`，供按钮 ↔ dock 共享）；
   - `src/client/session-guard-bridge.ts` — session-guard RPC 透传（fail-open，未装则静默）；
   - `src/client/index.ts` — slot 注册 + composer block 注入（`conversation.blocks.set`）。
-- **作用域对比**：本插件冻结按钮 = **会话级**（按 sessionId 锁那一个会话）；session-guard **自动高峰门 = 全局**（入峰暂停全部、退峰自动恢复全部）。两者互补——自动门管全局、按钮管单会话。
+- **作用域对比**：本插件冻结按钮 = **会话级**（按 sessionId 锁那一个会话）；session-guard 的高峰自动门 / step 门 = **全局或会话级暂停**（入峰拉门、退峰自动放行）。
+
+**分工（重要）：本插件只负责「排」，session-guard 只负责「停」**
+
+| | 本插件（input-traffic） | session-guard |
+|---|---|---|
+| 职责 | 用户输入进**哪条队列、什么档位、何时被消费** | **何时允许推进**（step / 回合 / 请求） |
+| DSH 原语 | `next-step` / `next-turn` 两条待处理队列 + `updateQueue(steer\|remove\|edit)` / `send` / `cancel` | `agent/pre-step`（step 门）、`agent.cancel({keepInbox:true})` + `goals.pause`、`agent/request` hold |
+| 冻结 | 摘 `queued` + `steering` 行（**保留档位**）+ composer block | `stopNextTurn`：**先释放 step 门**再做回合级暂停（否则两边互等） |
+| 恢复 | 按档位重投（红 cancel+send / 黄 steer / 绿 send） | `resume`：从暂停点续跑 |
+
+两条队列的物理含义：`next-step` = 「与**工具返回同级**的下一个 step，仍在同一个 turn 内」；`next-turn` = 「新的回合」。所以黄档是「插到当前回合的下一步」，绿档是「等回合结束后再开一轮」——这正是三档能被 API 在同一次 turn 中途看到的原因。
 
 ## 队列管理
 

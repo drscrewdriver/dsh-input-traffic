@@ -108,7 +108,18 @@ The freeze button hands off to a **sessionGuard bridge** (`src/client/session-gu
   - `src/client/freeze-store.ts` — session-scoped freeze state (`Map<sessionId, {frozen, pending}>`, shared by button ↔ dock);
   - `src/client/session-guard-bridge.ts` — session-guard RPC bridge (fail-open, silently skipped when session-guard is absent);
   - `src/client/index.ts` — slot registration + composer-block injection (`conversation.blocks.set`).
-- **Scope comparison**: this plugin's freeze button = **per-session** (locks that one session by id); session-guard's **auto peak gate = global** (pauses all running sessions on peak entry, resumes all on exit). They complement each other — the gate handles the global case, the button the single-session case.
+- **Scope comparison**: this plugin's freeze button = **per-session** (locks that one session by id); session-guard's **peak auto gate / step gate = global or per-session pause** (holds on peak entry, releases off-peak). They complement each other — this plugin owns the queue and freezing, session-guard owns when progress may happen.
+
+**Division of labour (important): this plugin only "orders", session-guard only "stops"**
+
+| | This plugin (input-traffic) | session-guard |
+|---|---|---|
+| Job | **which queue** user input goes to, at what tier, and when it is consumed | **when progress may happen** (step / turn / request) |
+| DSH primitives | the `next-step` / `next-turn` pending queues + `updateQueue(steer\|remove\|edit)` / `send` / `cancel` | `agent/pre-step` (step gate), `agent.cancel({keepInbox:true})` + `goals.pause`, `agent/request` hold |
+| Freeze | detach `queued` + `steering` rows (**tiers preserved**) + composer block | `stopNextTurn`: **release the step gate first**, then turn-level pause (otherwise both wait on each other) |
+| Resume | re-submit by tier (red cancel+send / yellow steer / green send) | `resume`: continue from the pause point |
+
+The two queues mean: `next-step` = "the next step, **same level as a tool result**, still inside the same turn"; `next-turn` = "a new turn". That is why the yellow tier inserts into the current turn and the green tier waits for the turn to close.
 
 ## Queue management
 
