@@ -1,0 +1,13 @@
+{
+  "id": "dsh-external/dsh-input-traffic",
+  "version": "0.2.9",
+  "main": "./lib/index.js",
+  "description": "Busy-time input queue: three-tier planning, drag-to-reorder, interject/interrupt, batch clear, session freeze.",
+  "contributes": {
+    "tools": [],
+    "skills": []
+  },
+  "client": {
+    "main": "./lib/client.js"
+  }
+}
