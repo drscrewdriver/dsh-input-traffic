@@ -23,6 +23,16 @@
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
 
+> **▼ DSH version support**
+> | DSH version | Queue strip / freeze button | Busy-Enter pin | Key difference |
+> | --- | --- | --- | --- |
+> | 0.1.1-rc.2 | ✅ | ✅ | `conversation.input.right` still carries the `InputZone` owner (the plugin no longer depends on it) |
+> | 0.1.2-rc.1 | ✅ | ✅ | That slot lost its owner (`InputBar.tsx:466` passes `{}`); the freeze button now reads the session standard kit `useSession` |
+>
+> - **One artifact, runtime-adaptive**: the same `lib/client.js` works on both releases. The client bundle only `require`s `react` / `react/jsx-runtime` / `@deepseek-ai/dsh-client-ui-primitives` — all three are in the shared module table of both releases, so the `dsh-client-runtime` → `dsh-client-store` rename never reaches it.
+> - **Only the two-release intersection is consumed**: the queue strip lives in `conversation.input.dock` (owner `InputZone` in both releases, and `input.draft` exists in both); the freeze button lives in `conversation.input.right`, whose owner was removed in 0.1.2, so the component reads only `useSession` / `sessionId` — both present in `SessionStandardProps` on both releases.
+> - **Queue strip position**: registered with `order: 1000`, so it sorts after every known contributor of the `conversation.input.dock` band (todo 0 / goal 10 / official queue 20 / dsh-perm-gate notice 30) and sits directly on top of the composer card. DSH has no "last" slot semantics, so this is a convention rather than a structural guarantee — a third-party plugin registering a larger `order` could still land below it.
+
 > **Compatibility note:** v0.2.9 ships Japanese (`ja`) and Korean (`ko`) dictionaries, but the current official DSH releases expose only `zh` and `en` through `LocaleRuntime`. On stock DSH, selecting `ja` or `ko` fails with `locale "<id>" is not registered`. These languages will work after official DSH adds the locale IDs. Advanced users can use a DSH fork that updates `LOCALE_IDS` (locale-settings.ts) and `LOCALES` labels (client/index.ts), then rebuild. Changing this plugin alone cannot extend DSH's global locale list.
 
 > While the agent is busy, "interrupt" and "queue" are no longer mutually exclusive: red interrupts and sends now, yellow inserts at the next turn, green queues until the end — all three coexist. Near DeepSeek peak pricing hours, one click freezes the session; resume later during off-peak pricing.

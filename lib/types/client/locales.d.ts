@@ -1,4 +1,4 @@
-/** `steer` namespace dictionaries. */
+/** `steer` client dictionaries (zh / en / ja / ko). */
 /** Dictionary namespace owned by this plugin. */
 export declare const NS = "steer";
 /** Simplified Chinese dictionary (the key-set source of truth). */
@@ -55,6 +55,10 @@ export declare const zh: {
 };
 /** English dictionary (keys mirror zh). */
 export declare const en: Record<keyof typeof zh, string>;
+/** Japanese dictionary (keys mirror zh). */
+export declare const ja: Record<keyof typeof zh, string>;
+/** Korean dictionary (keys mirror zh). */
+export declare const ko: Record<keyof typeof zh, string>;
 /** Dictionary key union. */
 export type SteerKey = keyof typeof zh;
 //# sourceMappingURL=locales.d.ts.map

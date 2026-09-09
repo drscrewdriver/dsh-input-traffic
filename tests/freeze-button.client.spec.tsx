@@ -14,7 +14,15 @@ function snapshot(queue: ConversationSnapshot['queue'], running = true): Convers
   return { running, subagent: null, queue }
 }
 
-function mount(snap: ConversationSnapshot) {
+/**
+ * Mount the control with the two-version props intersection: the session
+ * standard kit always (`useSession` + `sessionId`), and — only when
+ * `legacyOwner` is set — the 0.1.1 `InputZone` owner share that 0.1.2 no
+ * longer delivers (`InputBar.tsx:466` renders the slot with `{}`).
+ * @param snap - the session snapshot the standard kit selector answers with.
+ * @param options - `legacyOwner` adds the 0.1.1-only `session` owner share.
+ */
+function mount(snap: ConversationSnapshot, options: { legacyOwner?: boolean } = {}) {
   const updateQueue = vi.fn().mockResolvedValue(undefined)
   const cancel = vi.fn().mockResolvedValue(undefined)
   const send = vi.fn().mockResolvedValue(undefined)
@@ -23,7 +31,8 @@ function mount(snap: ConversationSnapshot) {
   const setComposerBlock = vi.fn()
   const t = vi.fn((key: string) => key)
   const props = {
-    session: snap,
+    useSession: <T,>(selector: (s: ConversationSnapshot) => T): T => selector(snap),
+    ...(options.legacyOwner === true ? { session: snap } : {}),
     updateQueue,
     cancel,
     send,
@@ -34,7 +43,7 @@ function mount(snap: ConversationSnapshot) {
     t,
   } as unknown as FreezeButtonProps
   const view = render(<FreezeButton {...props} />)
-  return { view, updateQueue, cancel, send, sendSteer, setComposerBlock, notify, t }
+  return { view, updateQueue, cancel, send, sendSteer, setComposerBlock, notify, t, props }
 }
 
 beforeEach(() => {
@@ -48,6 +57,36 @@ afterEach(() => {
 })
 
 describe('FreezeButton', () => {
+  it('freezes with the 0.1.2 props shape: no owner share, session data via useSession', async () => {
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
+    ]
+    const { updateQueue, props } = mount(snapshot(rows))
+    // 0.1.2 renders `conversation.input.right` with `{}` — the owner share
+    // must not exist in props at all.
+    expect('session' in (props as object)).toBe(false)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
+    expect(freezeStore.getSnapshot('s1')).toEqual({
+      frozen: true,
+      pending: [{ text: 'a', tier: 'queue' }],
+    })
+  })
+
+  it('tolerates the 0.1.1 owner share when the harness still delivers it', async () => {
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
+    ]
+    const { updateQueue } = mount(snapshot(rows), { legacyOwner: true })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
+    expect(freezeStore.getSnapshot('s1').frozen).toBe(true)
+  })
+
   it('freeze detaches every queued row and preserves its text', async () => {
     const rows = [
       { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },

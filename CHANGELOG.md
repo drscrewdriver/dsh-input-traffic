@@ -2,6 +2,21 @@
 
 所有重要变更与 bug 修复记录于此。版本遵循语义化版本（`dsh plugin --profile web add dsh-input-traffic` 安装）。
 
+## Unreleased
+
+### 新增：DSH 双版本兼容（0.1.1-rc.2 / 0.1.2-rc.1）
+
+- **单一产物，运行时自适应**：同一份 `lib/client.js` 在两个版本都能加载，无版本号字符串分支。
+- **冻结按钮改读会话标准件**：`conversation.input.right` 在 0.1.2 起不再传 `InputZone` owner（`InputBar.tsx:466` 传 `{}`），原先读 `session.queue` 会在该版本直接抛错。现改为 `useSession(s => s.queue)`——`useSession` / `sessionId` 在两版 `SessionStandardProps` 中均存在。
+- **本地契约收紧到两版交集**：`src/types/contracts.d.ts` 的 `conversation.input.right` 去掉 `owner`，`InputZone` 只声明被消费的 `input.draft`；再引入版本专属 owner 会直接 `tsc` 报错。
+- **元数据**：`engines.dsh` 收窄为 `>=0.1.0-rc.7 <0.2.0-0`；`peerDependencies` 移除 `@deepseek-ai/dsh-client-runtime`（0.1.2 已改名 `dsh-client-store`，本插件运行时不依赖它）。
+
+### 修复：等待队列被其他条目插到输入卡片之间
+
+- **现象**：`dsh-perm-gate` 的审批提示条出现在等待队列与输入卡片之间。
+- **根因**：list 型 slot 的显示位置只由 `order` 决定（`scoped-slots.tsx` 把 shadowing 胜者按 `order` 排序），`priority` 只决定同 `id` 单元格的胜者。队列条沿用官方 `order: 20`，因此排在提示条的 `30` 之前。
+- **修复**：保持 `priority: -1`（赢得官方 `queue` 单元格），`order` 提到 `QUEUE_DOCK_ORDER = 1000`，排在 `conversation.input.dock` 带内所有已知条目之后，紧贴输入卡片。DSH 无 "last" 语义，第三方注册更大 `order` 仍可能插入（README 已注明该前提）。
+
 ## 0.2.8 — 2026-08-24
 
 ### 新增：日夜模式自动适配

@@ -24,23 +24,34 @@ import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import { sessionGuardResume, sessionGuardStopNextTurn } from './session-guard-bridge.ts'
 import css from './freeze-button.module.css'
 
-/** Full props of the composer-right entry: InputZone owner share + injected verbs + locale seat. */
-export type FreezeButtonProps = PropsRuntime<'conversation.input.right'> & SteerQueueDockInjected & PropsLocale<'steer'>
+/**
+ * Full props of the composer-right entry.
+ *
+ * DUAL-VERSION: 0.1.1 delivers the `InputZone` owner share here, 0.1.2 renders
+ * the slot with `{}` (`InputBar.tsx:466`). Only the session standard kit is
+ * shared, so the type declares exactly that — reading `session`/`input` off
+ * this slot is a compile error, not a 0.1.2 crash.
+ */
+export type FreezeButtonProps =
+  Pick<PropsRuntime<'conversation.input.right'>, 'useSession' | 'sessionId'>
+  & SteerQueueDockInjected
+  & PropsLocale<'steer'>
 
 /**
  * Freeze/resume toggle for the peak-hour scenario.
  * @param props - slot props; the session snapshot drives the detach list.
  */
-export function FreezeButton({ session, updateQueue, cancel, send, sendSteer, sessionId, setComposerBlock, notify, t }: FreezeButtonProps) {
+export function FreezeButton({ useSession, updateQueue, cancel, send, sendSteer, sessionId, setComposerBlock, notify, t }: FreezeButtonProps) {
   // The freeze store is keyed by session: read the owning session's snapshot.
   const sid = sessionId ?? ''
   const { frozen } = useSyncExternalStore(freezeStore.subscribe, () => freezeStore.getSnapshot(sid))
+  const queue = useSession(s => s.queue)
 
   const freeze = async (): Promise<void> => {
     // Detach every pending input row — queued (next-turn) and already-steered
     // (next-step) alike — so nothing stays in the live queue while frozen.
     // Steered rows keep their next intent as a safe_point plan for resume.
-    const rows = session.queue.filter(row => row.placement === 'queued' || row.placement === 'steering')
+    const rows = queue.filter(row => row.placement === 'queued' || row.placement === 'steering')
     // Preserve plain-text copies; non-text rows cannot be re-sent and are
     // released by the freeze (documented limitation).
     const pending: { text: string; tier: FrozenTier }[] = rows.flatMap(row =>

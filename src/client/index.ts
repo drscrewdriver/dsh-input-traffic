@@ -10,6 +10,17 @@
  * 4. shadows the official busy-Enter settings row (`settings.general.item`
  *    cell id `composer-enter`, priority -1) with a null render.
  *
+ * ORDERING (why the dock registers at QUEUE_DOCK_ORDER instead of the
+ * official dock's 20): a list slot's DISPLAY position is decided by `order`
+ * alone — `ui-renderer/src/client/scoped-slots.tsx` maps the shadowing
+ * winners to rows and then sorts them by `order` (both 0.1.1 and 0.1.2) —
+ * while `priority` only decides which entry wins a shared cell id. Keeping
+ * the official 20 therefore left the strip above any later contributor
+ * (dsh-perm-gate's notice registers order 30), which pushed that notice
+ * between the queue strip and the composer card. A deliberately high order
+ * keeps the strip adjacent to the card; priority stays -1 so the cell
+ * takeover still holds.
+ *
  * All @deepseek-ai/* imports are type-only: collaboration happens through
  * cordis services and slot registration only (client bundle purity).
  */
@@ -28,6 +39,19 @@ const CONVERSATION_SETTINGS_NAMESPACE = 'ui-conversation'
 
 /** Busy-Enter field inside that namespace; the plugin pins it to queue. */
 const BUSY_ENTER_FIELD = 'busyEnter'
+
+/**
+ * Display order of the queue strip inside `conversation.input.dock`.
+ *
+ * List rows render sorted by `order` ascending, so a value above every other
+ * contributor keeps the strip as the bottom-most entry of the band — directly
+ * on top of the composer card. Known contributors in both 0.1.1-rc.2 and
+ * 0.1.2-rc.1: `todo` 0, `goal` 10, official `queue` 20, `dsh-perm-gate.notice`
+ * 30. DSH has no "last" slot semantics, so this is a convention, not a
+ * structural guarantee: a third party registering a larger value could still
+ * land below us.
+ */
+export const QUEUE_DOCK_ORDER = 1000
 
 /**
  * Deliver one plain-text message into the session's next step. The exposed
@@ -65,11 +89,13 @@ export function apply(ctx: ClientContext): void {
   })
   void conversationSettings.set(BUSY_ENTER_FIELD, 'queue')
 
-  // Shadow the official queue dock with the three-tier planning strip.
+  // Shadow the official queue dock with the three-tier planning strip. The
+  // high `order` keeps it the bottom-most entry of the band (see the file
+  // header); `priority: -1` is what wins the official `queue` cell.
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
     id: 'queue',
-    order: 20,
+    order: QUEUE_DOCK_ORDER,
     priority: -1,
     locale: NS,
     inject: (sessionId: SessionId): SteerQueueDockInjected => {
