@@ -26,13 +26,16 @@
 - [한국어 changelog](./CHANGELOG.ko.md)
 
 > **▼ DSH 版本适配**
-> | DSH 版本 | 队列条 / 冻结按钮 | 繁忙时 Enter 钉住 | 关键差异 |
-> | --- | --- | --- | --- |
-> | 0.1.1-rc.2 | ✅ | ✅ | `conversation.input.right` 仍带 `InputZone` owner（插件已不依赖） |
-> | 0.1.2-rc.1 | ✅ | ✅ | 该槽改为无 owner（`InputBar.tsx:466` 传 `{}`）；冻结按钮改读会话标准件 `useSession` |
 >
-> - **单一产物，运行时自适应**：同一份 `lib/client.js` 在两个版本都可用。客户端 bundle 只 `require` `react` / `react/jsx-runtime` / `@deepseek-ai/dsh-client-ui-primitives`，三者在两版的共享模块表内，不涉及 `dsh-client-runtime` → `dsh-client-store` 的改名。
-> - **只消费两版共享面**：队列条在 `conversation.input.dock`（两版都带 `InputZone` owner，`input.draft` 两版都有）；冻结按钮在 `conversation.input.right`，该槽 0.1.2 起不再传 owner，因此组件只读 `useSession` / `sessionId`——两者在两版 `SessionStandardProps` 中都有。
+> 本插件 **仅支持 DSH v0.1.2+**。
+>
+> | DSH 版本 | 状态 | 说明 |
+> | --- | --- | --- |
+> | ≥ 0.1.2-alpha.1 | ✅ 支持 | 覆盖 0.1.2 / 0.1.3 / 0.1.4 / 0.1.5 系列 |
+> | < 0.1.2-alpha.1 | ⚠️ 不建议 | 请留在旧版插件（0.2.10-beta.2 及更早）；**不要在 v0.1.2+ 的 DSH 上运行旧版插件，请升级** |
+>
+> - **分界点在 0.1.2-alpha.1**：`@deepseek-ai/dsh-client-runtime` 在该版本被整体删除（commit `be531688f3`），它发布的 `ClientContext` / `SessionId` 不再存在。本版本起改为从 `@deepseek-ai/cordis` 引入 `Context`、从 `@deepseek-ai/dsh-session/types` 引入 `SessionId`，与官方客户端插件一致。
+> - **旧版为什么不能配新版 DSH**：旧版产物中的 `.d.ts` 仍引用已删除的 `@deepseek-ai/dsh-client-runtime/client`，在 v0.1.2+ 上做类型检查会解析失败。运行时 bundle 虽自包含，仍请一律升级到本版本。
 > - **队列条位置**：注册 `order: 1000`，排在 `conversation.input.dock` 带内所有已知条目（todo 0 / goal 10 / 官方 queue 20 / dsh-perm-gate 提示 30）之后，紧贴输入卡片。DSH 没有 "last" 语义，这是约定而非结构性保证——第三方插件若注册更大的 `order` 仍可能插到它下面。
 
 > **兼容性说明：** v0.2.9 已包含日语（`ja`）和韩语（`ko`）字典，但当前官方 DSH 只通过 `LocaleRuntime` 提供 `zh` 和 `en`。在原版 DSH 中选择 `ja` 或 `ko` 会失败，并提示 `locale "<id>" is not registered`。需要等待官方 DSH 增加对应 locale ID 后才能正常使用。高级用户可以维护 DSH fork，在 `packages/client/locale/src/locale-settings.ts` 更新 `LOCALE_IDS`，在 `packages/client/locale/src/client/index.ts` 更新 `LOCALES` 标签，并补齐核心字典和测试，然后重新构建并运行 fork 版本。仅修改本插件无法扩展 DSH 的全局 locale 列表。

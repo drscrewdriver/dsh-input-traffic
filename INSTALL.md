@@ -19,6 +19,17 @@ The placeholders in this guide are:
 - `<profile>`: the DSH profile to modify, usually `web`;
 - `dsh-input-traffic`: the npm package and runtime plugin ID.
 
+> **Version requirement — DSH v0.1.2 or newer.**
+>
+> Check the running version first (`dsh --version`).
+>
+> | DSH version | Action |
+> | --- | --- |
+> | ≥ 0.1.2 | Install this release. |
+> | < 0.1.2 | Stay on the previous plugin line (0.2.10-beta.2 or earlier). Do not run an older plugin build against DSH v0.1.2+ — upgrade the plugin instead. |
+>
+> The boundary is `0.1.2-alpha.1`, where DSH removed `@deepseek-ai/dsh-client-runtime`. This release imports `Context` from `@deepseek-ai/cordis` and `SessionId` from `@deepseek-ai/dsh-session/types` instead, matching the official client plugins.
+
 ## 0. Prerequisites and profile discovery
 
 ```bash

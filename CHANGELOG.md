@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+### 破坏性：仅支持 DSH 0.1.2+，完成 `dsh-client-runtime` 移除替换（0.2.11-beta.1）
+
+- **`engines.dsh` 收窄为 `>=0.1.2-alpha.1 <0.2.0-0`**：`@deepseek-ai/dsh-client-runtime` 在 0.1.2-alpha.1 被整体删除（commit `be531688f3`），该版本即为本插件的硬分段点。旧版线（≤0.2.10-beta.2）继续服务 DSH 0.1.0/0.1.1。
+- **`ClientContext` / `SessionId` 改由真实归属包提供**：`src/client/index.ts` 改为 `import type { Context as ClientContext } from '@deepseek-ai/cordis'` 与 `import type { SessionId } from '@deepseek-ai/dsh-session/types'`，与官方客户端插件一致。
+- **契约拆除 `dsh-client-runtime` 镜像**：`src/types/contracts.d.ts` 删除 `declare module '@deepseek-ai/dsh-client-runtime/client'`；`QueuedMessage` / `SessionSnapshot` / `ISessions` 迁回 `@deepseek-ai/dsh-api-session-controller/client`，`SnapshotSelectorHook` 迁回 `@deepseek-ai/dsh-client-store`。
+- **新增 `src/types/cordis-augment.d.ts`**：把 `slots` / `sessions` / `locale` / `settingsScope` / `conversation` 声明到 cordis `Context`（官方客户端插件的做法），替代已删除的 `ClientContext`；`ctx.get<IConversation>('conversation')` 相应改为 `ctx.get('conversation')`，因为真实 cordis `get` 由 `Context[K]` 决定返回类型。
+- **`SettingsScopeSnapshot` 补齐 `base` / `user` / `revision`**，`SettingsScopeFace.bind` 增加可选 `decode`。
+- **新增 `@deepseek-ai/dsh-session` peerDependency**；其余 `@deepseek-ai/dsh-client-*` peer 区间同步收窄到 `>=0.1.2-alpha.1 <0.2.0-0`。
+
 ### 变更：冻结按钮文案与 session-guard 的分工说明
 
 - **按钮文案**：`steer.freeze` →「冻结追加」（Freeze & append / 凍結して追加 / 동결 후 추가），

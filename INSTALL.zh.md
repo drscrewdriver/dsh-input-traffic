@@ -19,6 +19,17 @@
 - `<profile>`：要修改的 DSH profile，通常是 `web`；
 - `dsh-input-traffic`：npm 包名与运行时插件 ID。
 
+> **版本要求 —— 仅支持 DSH v0.1.2 及以上。**
+>
+> 安装前先确认版本（`dsh --version`）。
+>
+> | DSH 版本 | 操作 |
+> | --- | --- |
+> | ≥ 0.1.2 | 安装本版本。 |
+> | < 0.1.2 | 留在旧版插件（0.2.10-beta.2 及更早）。**不要在 v0.1.2+ 的 DSH 上运行旧版插件，请升级插件。** |
+>
+> 分界点是 `0.1.2-alpha.1`：该版本删除了 `@deepseek-ai/dsh-client-runtime`。本版本改为从 `@deepseek-ai/cordis` 引入 `Context`、从 `@deepseek-ai/dsh-session/types` 引入 `SessionId`，与官方客户端插件一致。
+
 ## 0. 前置检查与 profile 确认
 
 ```bash

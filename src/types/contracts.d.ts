@@ -1,88 +1,86 @@
 /**
  * Local contract declarations for the @deepseek-ai/* platform surfaces the
  * plugin consumes. The npm publication chain for the harness client packages
- * is incomplete (rc.1 placeholders miss several transitive packages), and the
+ * is incomplete (rc placeholders miss several transitive packages), and the
  * plugin never value-imports them anyway — the browser half talks to cordis
  * services and slot registration only, and the loader module table supplies
  * the real modules at runtime.
  *
- * These declarations mirror the harness sources at the anchors below, and
- * deliberately declare only the INTERSECTION of the two supported releases
- * (0.1.1-rc.2 and 0.1.2-rc.1). A surface that exists in one release but not
- * the other is either omitted or narrowed to its shared members, so a
- * regression that reaches for a version-specific face fails `tsc` instead of
- * failing in a user's browser.
+ * These declarations mirror the harness sources at the anchors below for the
+ * supported release segment `>=0.1.2-alpha.1 <0.2.0-0` — the segment that
+ * removed `@deepseek-ai/dsh-client-runtime`. Every type the deletion orphaned
+ * is re-homed to the package that owns it today, so the plugin consumes the
+ * same public API the harness itself consumes. Members are declared only where
+ * this plugin reads them, so a regression that reaches for a surface the
+ * segment does not carry fails `tsc` instead of failing in a user's browser.
  *
- * Mirror anchors (verified 2026-09-09):
- * - `packages/client/runtime/src/client/sessions/conversation.ts:437` —
- *   0.1.1 `ConversationSnapshot` / `:317` `QueuedMessage`.
- * - `packages/api/session-controller/src/client/contract/snapshot.ts:65` —
- *   0.1.2 `SessionSnapshot` / `:10` `QueuedMessage`.
- * - `packages/client/ui-conversation/src/client/contract/slots.ts:231` (0.1.1)
- *   and `:135` (0.1.2) — the input-region slot map.
- * - `packages/client/ui-conversation/src/client/skeleton/InputBar.tsx:466` —
- *   0.1.2 renders `conversation.input.right` with an empty owner object.
+ * Mirror anchors (verified 2026-09-11 against dsh-v0.1.5-rc.2):
+ * - `packages/core/session/src/types.ts:19` — `SessionId`.
+ * - `packages/api/session-controller/src/client/contract/snapshot.ts:83` —
+ *   `SessionSnapshot` / `:11` `QueuedMessage`.
+ * - `packages/api/session-controller/src/client/contract/sessions.ts:21` —
+ *   `ISessions`.
+ * - `packages/client/store/src/contract.ts:20` — `SnapshotSelectorHook`.
+ * - `packages/client/ui-conversation/src/client/contract/slots.ts` — the
+ *   input-region slot map.
  */
 
-declare module '@deepseek-ai/dsh-client-runtime/client' {
-  /** Branded session identity (mirrors the connection package's SessionId). */
+/** Branded session identity. */
+declare module '@deepseek-ai/dsh-session/types' {
   export type SessionId = string & { readonly __sessionId?: unique symbol }
+}
 
-  /** One row of the authoritative transient inbox projection. */
-  export interface QueueRow {
-    id: string
-    messageId: string
-    placement: 'queued' | 'steering' | 'context'
-    preview: string
-    text: string | null
-    content: readonly unknown[]
+/** Session queue and lifecycle projections owned by the session controller. */
+declare module '@deepseek-ai/dsh-api-session-controller/client' {
+  import type { Context } from '@deepseek-ai/cordis'
+  import type { SessionId } from '@deepseek-ai/dsh-session/types'
+
+  /** One transient inbox occurrence from the authoritative queue snapshot. */
+  export interface QueuedMessage {
+    readonly id: string
+    readonly messageId: string
+    readonly placement: 'queued' | 'steering' | 'context'
+    readonly rpcId?: string
+    readonly content: readonly unknown[]
+    readonly preview: string
+    readonly text: string | null
   }
 
   /**
-   * The conversation snapshot consumed by the session standard kit.
-   *
-   * DUAL-VERSION: 0.1.1 names this `ConversationSnapshot`; 0.1.2 names the
-   * session-scoped equivalent `SessionSnapshot`. Only the shared members this
-   * plugin consumes are declared — `queue` / `running` / `subagent` exist in
-   * both, while `subagent.parentAvailable` is optional in 0.1.2.
+   * Immutable Session lifecycle and control snapshot, consumed by the session
+   * standard kit. Only the members this plugin reads are declared.
    */
-  export interface ConversationSnapshot {
-    running: boolean
-    subagent: { address: { mode: string }; parentAvailable: boolean } | null
-    queue: readonly QueueRow[]
+  export interface SessionSnapshot {
+    readonly sessionId: SessionId
+    readonly queue: readonly QueuedMessage[]
+    readonly running: boolean
+    readonly subagent: {
+      readonly address: { readonly mode: string }
+      readonly parentAvailable?: boolean
+    } | null
   }
-
-  /** Session-store selector hook shape delivered to session-scope slots. */
-  export type SnapshotSelectorHook<S> = <T>(selector: (snapshot: S) => T) => T
 
   /** Session registry: scope resolution for session-addressed services. */
   export interface ISessions {
-    scope(sessionId: SessionId): ClientContext | undefined
-  }
-
-  /** The client root context merge the plugin's browser half receives. */
-  export interface ClientContext {
-    effect(cleanup: () => (() => void) | void, label?: string): void
-    on(event: string, listener: (...args: never[]) => unknown, options?: unknown): () => void
-    get<T>(key: string): T | undefined
-    slots: import('@deepseek-ai/dsh-client-ui-slots').SlotsFace
-    sessions: ISessions
-    locale: import('@deepseek-ai/dsh-client-locale/client').LocaleFace
-    settingsScope: import('@deepseek-ai/dsh-client-ui-settings/client').SettingsScopeFace
+    scope(sessionId: SessionId): Context | undefined
   }
 }
 
+/** Snapshot-store selector hooks. */
+declare module '@deepseek-ai/dsh-client-store' {
+  /** Selector hook bound to one observable snapshot store. */
+  export type SnapshotSelectorHook<T> = <S>(sel: (s: T) => S, eq?: (a: S, b: S) => boolean) => S
+}
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
-  import type { ConversationSnapshot, SessionId, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-runtime/client'
+  import type { SessionId } from '@deepseek-ai/dsh-session/types'
+  import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
+  import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 
   /**
-   * Owner share of the input-region slots.
-   *
-   * DUAL-VERSION: only the consumed member is declared. The real owner also
-   * carries `session`, whose type differs per release (0.1.1
-   * `ConversationSnapshot` vs 0.1.2 `SessionSnapshot`) — this plugin never
-   * reads it, because session data comes from the session standard kit
-   * (`useSession`), which both releases deliver.
+   * Owner share of the input-region slots. Only the consumed member is
+   * declared: the real owner also carries `session`, which this plugin never
+   * reads — session data comes from the session standard kit (`useSession`).
    */
   export interface InputZone {
     input: { draft: string }
@@ -91,11 +89,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   /** Slot map entries consumed by this plugin (subset of the harness table). */
   export interface SlotMap {
     'conversation.input.dock': { kind: 'list'; scope: 'session'; owner: InputZone }
-    /**
-     * DUAL-VERSION: 0.1.1 declares `owner: InputZone`; 0.1.2 declares no owner
-     * and renders this slot with `{}` (`InputBar.tsx:466`). The intersection
-     * is owner-less — do NOT read `session`/`input` here.
-     */
+    /** Rendered with an empty owner object; do NOT read `session`/`input` here. */
     'conversation.input.right': { kind: 'list'; scope: 'session' }
     'settings.general.item': { kind: 'list'; scope: 'root'; owner: object }
   }
@@ -107,7 +101,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
   /** Session-standard kit delivered to session-scope slot components. */
   export interface SessionStandardProps {
-    useSession: SnapshotSelectorHook<ConversationSnapshot>
+    useSession: SnapshotSelectorHook<SessionSnapshot>
     sessionId: SessionId
   }
 
@@ -145,15 +139,27 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 declare module '@deepseek-ai/dsh-client-locale/client' {
   /** Dictionary registration and bound-translate face. */
   export interface LocaleFace {
-    register(namespace: string, dictionaries: Record<string, Record<string, string>>): void
-    bind<N extends string>(namespace: N): (key: string, params?: Record<string, unknown>) => string
+    register(namespace: string, dictionaries: Record<string, Record<string, string>>): () => void
   }
 }
 
 declare module '@deepseek-ai/dsh-client-ui-settings/client' {
+  /** Snapshot of one durable namespace scope, as the settings card reads it. */
+  export interface SettingsScopeSnapshot<T> {
+    status: 'loading' | 'ready' | 'unavailable'
+    value: T | undefined
+    /** Composition base layer and raw user layer, exposed for override display. */
+    base: unknown
+    user: unknown
+    /** Write fence: the revision this snapshot was folded at. */
+    revision: number | undefined
+    writable: boolean
+    mode: 'host' | 'memory'
+  }
+
   /** Durable namespace scope owner used to pin the busy-Enter field. */
   export interface SettingsScope<T> {
-    getSnapshot(): { status: 'loading' | 'ready' | 'unavailable'; value: T | undefined; writable: boolean; mode: 'host' | 'memory' }
+    getSnapshot(): SettingsScopeSnapshot<T>
     subscribe(listener: () => void): () => void
     set(field: string, value: unknown): Promise<void>
     unset(field: string): Promise<void>
@@ -161,7 +167,7 @@ declare module '@deepseek-ai/dsh-client-ui-settings/client' {
 
   /** Context merge providing namespace binding. */
   export interface SettingsScopeFace {
-    bind<T>(spec: { namespace: string }): SettingsScope<T>
+    bind<T>(spec: { namespace: string; decode?: (section: unknown) => T | undefined }): SettingsScope<T>
   }
 }
 

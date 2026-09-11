@@ -24,10 +24,11 @@
  * All @deepseek-ai/* imports are type-only: collaboration happens through
  * cordis services and slot registration only (client bundle purity).
  */
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { NS, en, zh } from './locales.ts'
 import { SteerQueueDock } from './steer-queue-dock.tsx'
 import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
@@ -64,7 +65,7 @@ export const QUEUE_DOCK_ORDER = 1000
 function steerPrompt(actx: ClientContext, text: string): Promise<void> {
   // steer-mode prompt 面在本版（main@0.2.8）契约中未声明；resume 落到 conversation.send
   // （排队到下一轮）交付 safe_point 文本，与 feature 分支语义对齐但取当前可用 API。
-  const conversation = actx.get<IConversation>('conversation')
+  const conversation = actx.get('conversation')
   if (conversation === undefined) return Promise.reject(new Error('steer resume: conversation service unavailable'))
   return conversation.send(text)
 }
@@ -101,7 +102,7 @@ export function apply(ctx: ClientContext): void {
     inject: (sessionId: SessionId): SteerQueueDockInjected => {
       const actx = ctx.sessions.scope(sessionId)
       if (actx === undefined) throw new Error(`steer dock: session "${sessionId}" resolved no scope`)
-      const conversation = actx.get<IConversation>('conversation')
+      const conversation = actx.get('conversation')
       if (conversation === undefined) throw new Error('steer dock: conversation service unavailable')
       return {
         updateQueue: (itemId, action) => conversation.updateQueue(itemId, action),
@@ -122,7 +123,7 @@ export function apply(ctx: ClientContext): void {
     inject: (sessionId: SessionId): SteerQueueDockInjected => {
       const actx = ctx.sessions.scope(sessionId)
       if (actx === undefined) throw new Error(`steer freeze: session "${sessionId}" resolved no scope`)
-      const conversation = actx.get<IConversation>('conversation')
+      const conversation = actx.get('conversation')
       if (conversation === undefined) throw new Error('steer freeze: conversation service unavailable')
       return {
         updateQueue: (itemId, action) => conversation.updateQueue(itemId, action),
