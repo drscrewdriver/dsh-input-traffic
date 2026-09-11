@@ -4,6 +4,17 @@
 
 ## Unreleased
 
+### 变更：本线收窄为 DSH < 0.1.2-alpha.1（旧版线 compat，0.2.10-beta.3）
+
+- **`engines.dsh` 上限收窄**：`>=0.1.0-rc.7 <0.2.0-0` → `>=0.1.0-rc.7 <0.1.2-alpha.1`。
+  原上限声称兼容到 0.2.0，但 `@deepseek-ai/dsh-client-runtime` 在 DSH `0.1.2-alpha.1`
+  已被整体删除（commit `be531688f3`），本版本仍依赖它发布的 `ClientContext` / `SessionId`，
+  在 0.1.2+ 上会解析失败。收窄后安装器能挡住误装。
+- **双线分工**：`compat` dist-tag = 本线（DSH 0.1.0/0.1.1）；`beta` dist-tag = 0.1.2+ 线
+  （0.2.11 起，`ClientContext` 改由 `@deepseek-ai/cordis` 提供）。两条线互不覆盖，
+  升级 DSH 到 0.1.2+ 时需换线。
+- **代码不变**：本版本只改 engines、版本号与文档，`src/` 与 `lib/` 与 0.2.10-beta.2 一致。
+
 ### 变更：冻结按钮文案与 session-guard 的分工说明
 
 - **按钮文案**：`steer.freeze` →「冻结追加」（Freeze & append / 凍結して追加 / 동결 후 추가），
