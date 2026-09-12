@@ -27,10 +27,10 @@ import css from './freeze-button.module.css'
 /**
  * Full props of the composer-right entry.
  *
- * DUAL-VERSION: 0.1.1 delivers the `InputZone` owner share here, 0.1.2 renders
- * the slot with `{}` (`InputBar.tsx:466`). Only the session standard kit is
- * shared, so the type declares exactly that — reading `session`/`input` off
- * this slot is a compile error, not a 0.1.2 crash.
+ * The slot carries no `InputZone` owner on this segment (0.1.5 keeps the
+ * ownerless shape introduced in 0.1.2, `InputBar.tsx:466` renders `{}`); only
+ * the session standard kit is shared, so the type declares exactly that —
+ * reading `session`/`input` off this slot is a compile error, not a crash.
  */
 export type FreezeButtonProps =
   Pick<PropsRuntime<'conversation.input.right'>, 'useSession' | 'sessionId'>

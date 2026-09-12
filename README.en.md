@@ -23,15 +23,23 @@
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
 
-> **▼ DSH version support**
-> | DSH version | Queue strip / freeze button | Busy-Enter pin | Key difference |
-> | --- | --- | --- | --- |
-> | 0.1.1-rc.2 | ✅ | ✅ | `conversation.input.right` still carries the `InputZone` owner (the plugin no longer depends on it) |
-> | 0.1.2-rc.1 | ✅ | ✅ | That slot lost its owner (`InputBar.tsx:466` passes `{}`); the freeze button now reads the session standard kit `useSession` |
+> **▼ DSH version support** (compat/0.1.5 line, since 0.2.12-beta.1)
+> | DSH version | Status | Notes |
+> | --- | --- | --- |
+> | ≥ 0.1.5-alpha.1 | ✅ Supported | Verified against 0.1.5-rc.1 / rc.2 (type contracts mirrored from dsh-v0.1.5-rc.2) |
+> | < 0.1.5-alpha.1 | ⚠️ Not supported | Stay on the `main` line (0.2.11-beta.1, DSH 0.1.2+) or older |
 >
-> - **One artifact, runtime-adaptive**: the same `lib/client.js` works on both releases. The client bundle only `require`s `react` / `react/jsx-runtime` / `@deepseek-ai/dsh-client-ui-primitives` — all three are in the shared module table of both releases, so the `dsh-client-runtime` → `dsh-client-store` rename never reaches it.
-> - **Only the two-release intersection is consumed**: the queue strip lives in `conversation.input.dock` (owner `InputZone` in both releases, and `input.draft` exists in both); the freeze button lives in `conversation.input.right`, whose owner was removed in 0.1.2, so the component reads only `useSession` / `sessionId` — both present in `SessionStandardProps` on both releases.
+> - **The boundary is 0.1.5**: Session V3 (surface nodes), the dockkit Sidebar rewrite, and the Lexical composer are 0.1.5's structural changes. All three slot anchors this plugin shadows (`conversation.input.dock` / `conversation.input.right` / `settings.general.item`) survive in 0.1.5, and the service face (`send` / `cancel` / `updateQueue` / `blocks.set`) has no recorded break — so the code needs zero structural changes; only the supported segment is narrowed.
 > - **Queue strip position**: registered with `order: 1000`, so it sorts after every known contributor of the `conversation.input.dock` band (todo 0 / goal 10 / official queue 20 / dsh-perm-gate notice 30) and sits directly on top of the composer card. DSH has no "last" slot semantics, so this is a convention rather than a structural guarantee — a third-party plugin registering a larger `order` could still land below it.
+
+> **▼ Known DSH 0.1.5 regressions (host-side, not plugin bugs)**
+>
+> | Issue | Impact on this plugin | Discussion |
+> | --- | --- | --- |
+> | Forking a session inherits the parent's queued-not-yet-run prompts and re-runs them | This is exactly the queue this plugin manages: a forked child may replay the parent's pending queue | [#6314](https://github.com/deepseek-ai/deepseek-harness/discussions/6314) / [#6197](https://github.com/deepseek-ai/deepseek-harness/discussions/6197) |
+> | Lexical composer breaks under IME composition / browser translation | Affects the "pull back into composer" draft back-fill and send paths | [#6231](https://github.com/deepseek-ai/deepseek-harness/discussions/6231) / [#6052](https://github.com/deepseek-ai/deepseek-harness/discussions/6052) |
+> | Steer cannot preempt during a blocking tool wait (up to ~10 min) | The yellow "insert at next turn" tier is inert during that window — users may misattribute it to the plugin | [#6030](https://github.com/deepseek-ai/deepseek-harness/discussions/6030) |
+> | After upgrading an old profile, a stale client combo leaves the whole plugin tree inactive | First troubleshooting step: **hard-refresh the browser (clear cache)** | [#5999](https://github.com/deepseek-ai/deepseek-harness/discussions/5999) / [#6374](https://github.com/deepseek-ai/deepseek-harness/discussions/6374) |
 
 > **Compatibility note:** v0.2.9 ships Japanese (`ja`) and Korean (`ko`) dictionaries, but the current official DSH releases expose only `zh` and `en` through `LocaleRuntime`. On stock DSH, selecting `ja` or `ko` fails with `locale "<id>" is not registered`. These languages will work after official DSH adds the locale IDs. Advanced users can use a DSH fork that updates `LOCALE_IDS` (locale-settings.ts) and `LOCALES` labels (client/index.ts), then rebuild. Changing this plugin alone cannot extend DSH's global locale list.
 

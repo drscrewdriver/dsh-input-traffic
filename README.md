@@ -27,16 +27,24 @@
 
 > **▼ DSH 版本适配**
 >
-> 本插件 **仅支持 DSH v0.1.2+**。
+> 本插件（compat/0.1.5 线，0.2.12-beta.1 起）**仅支持 DSH v0.1.5+**。
 >
 > | DSH 版本 | 状态 | 说明 |
 > | --- | --- | --- |
-> | ≥ 0.1.2-alpha.1 | ✅ 支持 | 覆盖 0.1.2 / 0.1.3 / 0.1.4 / 0.1.5 系列 |
-> | < 0.1.2-alpha.1 | ⚠️ 不建议 | 请留在旧版插件（0.2.10-beta.2 及更早）；**不要在 v0.1.2+ 的 DSH 上运行旧版插件，请升级** |
+> | ≥ 0.1.5-alpha.1 | ✅ 支持 | 面向 0.1.5-rc.1 / rc.2 验证（类型契约已对照 dsh-v0.1.5-rc.2） |
+> | < 0.1.5-alpha.1 | ⚠️ 不支持 | 请留在 main 线（0.2.11-beta.1，支持 0.1.2+）或更早版本 |
 >
-> - **分界点在 0.1.2-alpha.1**：`@deepseek-ai/dsh-client-runtime` 在该版本被整体删除（commit `be531688f3`），它发布的 `ClientContext` / `SessionId` 不再存在。本版本起改为从 `@deepseek-ai/cordis` 引入 `Context`、从 `@deepseek-ai/dsh-session/types` 引入 `SessionId`，与官方客户端插件一致。
-> - **旧版为什么不能配新版 DSH**：旧版产物中的 `.d.ts` 仍引用已删除的 `@deepseek-ai/dsh-client-runtime/client`，在 v0.1.2+ 上做类型检查会解析失败。运行时 bundle 虽自包含，仍请一律升级到本版本。
+> - **分界点在 0.1.5**：Session V3（surface node）、dockkit Sidebar 重写、Lexical composer 是 0.1.5 的结构性变更。本插件的三个 slot 锚点（`conversation.input.dock` / `conversation.input.right` / `settings.general.item`）在 0.1.5 全部保留，服务面（`send` / `cancel` / `updateQueue` / `blocks.set`）无破坏记录，因此代码零结构改动，仅收窄支持分段。
 > - **队列条位置**：注册 `order: 1000`，排在 `conversation.input.dock` 带内所有已知条目（todo 0 / goal 10 / 官方 queue 20 / dsh-perm-gate 提示 30）之后，紧贴输入卡片。DSH 没有 "last" 语义，这是约定而非结构性保证——第三方插件若注册更大的 `order` 仍可能插到它下面。
+
+> **▼ DSH 0.1.5 已知回归（宿主侧，非本插件 bug）**
+>
+> | 问题 | 对本插件的影响 | 讨论 |
+> | --- | --- | --- |
+> | fork 会话继承父会话「已入队未执行」的 prompt 并自动重跑 | 正是本插件管理的等待队列：fork 出的子会话可能重放父会话排队中的消息 | [#6314](https://github.com/deepseek-ai/deepseek-harness/discussions/6314) / [#6197](https://github.com/deepseek-ai/deepseek-harness/discussions/6197) |
+> | composer 迁移 Lexical 后 IME 组合期 Enter 被当换行、浏览器翻译插件打崩输入框 | 影响「拉回编辑器回填草稿」与发送路径 | [#6231](https://github.com/deepseek-ai/deepseek-harness/discussions/6231) / [#6052](https://github.com/deepseek-ai/deepseek-harness/discussions/6052) |
+> | 阻塞式工具等待期间 steer 无法抢占（最长约 10 分钟） | 黄色「下一轮插入」档位在该窗口不生效，用户可能误以为是插件问题 | [#6030](https://github.com/deepseek-ai/deepseek-harness/discussions/6030) |
+> | 升级旧 profile 后 client combo 缓存陈旧，插件树整体不激活 | 排障第一步：**强制刷新浏览器（清缓存）**再排查 | [#5999](https://github.com/deepseek-ai/deepseek-harness/discussions/5999) / [#6374](https://github.com/deepseek-ai/deepseek-harness/discussions/6374) |
 
 > **兼容性说明：** v0.2.9 已包含日语（`ja`）和韩语（`ko`）字典，但当前官方 DSH 只通过 `LocaleRuntime` 提供 `zh` 和 `en`。在原版 DSH 中选择 `ja` 或 `ko` 会失败，并提示 `locale "<id>" is not registered`。需要等待官方 DSH 增加对应 locale ID 后才能正常使用。高级用户可以维护 DSH fork，在 `packages/client/locale/src/locale-settings.ts` 更新 `LOCALE_IDS`，在 `packages/client/locale/src/client/index.ts` 更新 `LOCALES` 标签，并补齐核心字典和测试，然后重新构建并运行 fork 版本。仅修改本插件无法扩展 DSH 的全局 locale 列表。
 

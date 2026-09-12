@@ -4,6 +4,15 @@
 
 ## Unreleased
 
+### 变更：仅支持 DSH 0.1.5+，compat/0.1.5 线（0.2.12-beta.1）
+
+- **`engines.dsh` 收窄为 `>=0.1.5-alpha.1 <0.2.0-0`**：0.1.5 引入 Session V3（surface node）、dockkit Sidebar 重写与 Lexical composer。核查确认本插件依赖的三个 slot 锚点（`conversation.input.dock` / `conversation.input.right` / `settings.general.item`）在 0.1.5 全部保留，`session.updateQueue` / `prompt` / `cancel` remote 无破坏记录，因此**代码零结构改动**，仅收窄支持分段。DSH 0.1.2/0.1.3 用户请留在 main 线（0.2.11-beta.1）。
+- **全部 `@deepseek-ai/*` peer 区间同步收窄**到 `>=0.1.5-alpha.1 <0.2.0-0`（`@deepseek-ai/cordis` 保持 `^4.0.1`）。
+- **类型契约锚点**：`src/types/contracts.d.ts` 的镜像锚点已于 2026-09-11 对照 `dsh-v0.1.5-rc.2` 验证，本版仅把头部 supported segment 更新为 0.1.5 分段。
+- **注释现代化**：`src/client/index.ts` 与 `freeze-button.tsx` 中 0.1.1/0.1.2 双版本历史注释改写为 0.1.5 现状（含 0.1.5 新增相邻 slot `conversation.composer.dock` / `conversation.input.left` 说明）。无行为变更。
+- **README 新增「0.1.5 已知回归」节**（宿主侧，非插件 bug）：fork 继承排队 prompt（#6314/#6197）、Lexical composer IME（#6231/#6052）、阻塞等待期间 steer 无法抢占（#6030）、升级后 client combo 缓存陈旧需强制刷新（#5999/#6374）。
+- ⚠️ **无实机验证声明**：本版在无 DSH 0.1.5 实机环境下发布（lint/test/build/assembly 通过 + 文档契约静态核对），`input.for(actx)` / `blocks.set` / dock 注入 props 三个未文档化面待实机回归（清单见仓库 checklist.md）。
+
 ### 破坏性：仅支持 DSH 0.1.2+，完成 `dsh-client-runtime` 移除替换（0.2.11-beta.1）
 
 - **`engines.dsh` 收窄为 `>=0.1.2-alpha.1 <0.2.0-0`**：`@deepseek-ai/dsh-client-runtime` 在 0.1.2-alpha.1 被整体删除（commit `be531688f3`），该版本即为本插件的硬分段点。旧版线（≤0.2.10-beta.2）继续服务 DSH 0.1.0/0.1.1。
