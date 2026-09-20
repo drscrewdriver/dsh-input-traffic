@@ -3,6 +3,9 @@
   "version": "0.2.11-beta.2",
   "main": "./lib/index.js",
   "description": "Busy-time input queue: three-tier planning, drag-to-reorder, interject/interrupt, batch clear, session freeze.",
+  "engines": {
+    "dsh": ">=0.1.2-alpha.1 <0.2.0-0"
+  },
   "contributes": {
     "tools": [],
     "skills": []
