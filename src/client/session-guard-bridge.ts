@@ -38,7 +38,6 @@ async function callGuard(sessionId: string, action: string): Promise<boolean> {
 // 探测标记：session-guard 客户端据此跳过自带的回退冻结按钮（避免双按钮/占位）。
 // 在 bundle 顶层执行；input-traffic 桥存在即置位。
 declare global {
-  // eslint-disable-next-line no-var
   var __DSH_SESSION_GUARD_BRIDGE__: boolean | undefined
 }
 try {

@@ -1,8 +1,50 @@
 /* Three-tier steering queue dock. Colors follow the red/yellow/green tier
    vocabulary (radix-adjacent tones, matching the official web theme). */
 
+/* Card-width column, deliberately narrower than the composer stack, so the
+   trailing tier/clear buttons can never be hit-tested by the conversation's
+   full-height resize strips (ui-conversation `.widthHandle`: absolute in
+   `.body`, z-index 8, and painted ABOVE the composer seat's z-index 7
+   subtree — a descendant's z-index cannot escape that stacking context, so
+   the dock can only get out of the strip's way geometrically). A full-width
+   dock ran its trailing controls under the right strip, which stole their
+   pointer events into a resize drag.
+ *
+   The strip's inner edge sits 24px outside the content column, so the dock
+   keeps the same term every other composer row uses: subtract both side
+   clearances and both dock insets from the stack width, cap at the composer
+   card minus the dock inners, center with auto margins, and hand the insets
+   back as padding so the panel lands flush under the input card. The min()
+   adds the strip itself: while the column is wide enough for the strip to
+   exist the dock additionally stops 24px before it (a 24px inset that leaves
+   the transcript's 24px inner offset intact), and when the strip collapses to
+   zero width on narrow columns the term is negative, min() drops it, and the
+   dock keeps the card width alone. Same reasoning as the official QueueDock
+   this dock shadows. */
 .dock {
-  width: 100%;
+  box-sizing: border-box;
+  flex: none;
+  width: min(
+    calc(
+      100% -
+      var(--dsh-composer-side-clearance, 16px) -
+      var(--dsh-composer-side-clearance, 16px) -
+      var(--dsh-composer-dock-inset, 8px) -
+      var(--dsh-composer-dock-inset, 8px)
+    ),
+    calc(
+      var(--dsh-chat-content-width, 100%) -
+      var(--dsh-composer-dock-inset, 8px) -
+      var(--dsh-composer-dock-inset, 8px)
+    )
+  );
+  max-width: calc(
+    var(--dsh-composer-card-max-width, var(--dsh-chat-content-width, 100%)) -
+    var(--dsh-composer-dock-inset, 8px) -
+    var(--dsh-composer-dock-inset, 8px)
+  );
+  margin: 0 auto;
+  padding: 0 var(--dsh-composer-dock-inset, 8px);
 }
 
 .panel {
