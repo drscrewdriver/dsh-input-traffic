@@ -2,6 +2,16 @@
 
 所有重要变更与 bug 修复记录于此。版本遵循语义化版本（`dsh plugin --profile web add dsh-input-traffic` 安装）。
 
+## 0.2.11-beta.2 — 2026-09-20
+
+### 修复：等待队列尾部按钮被「调整对话宽度」把手抢走点击
+
+- **现象**：队列卡片「取消并清空」与三档规划按钮（绿/黄/红）落在对话栏右侧的全高宽度把手（`div.wSkVaW_widthHandle[data-side="right"]`）覆盖范围内，点击被把手解释为拖拽，按钮无法操作。
+- **根因**：把手位于 `.body`（`position: absolute`、`z-index: 8`），而 composer 座位 `.composerSeat` 是 `z-index: 7` 的层叠上下文；本插件的 `.dock` 原为 `width: 100%`（铺满 composer 栈），比输入卡片宽约 32px，尾部控件因此伸进把手的命中带。作为层叠上下文内的后代，dock 无法用 `z-index` 越出撤销层级，只能从几何上让位。
+- **修复**：`.dock` 收敛到官方 `QueueDock` 同款卡片列——按「两侧 clearance + 两侧 dock inset」从栈宽扣除、上限为 composer 卡片宽减去 dock inners、`margin: 0 auto` 居中、inset 以 `padding` 返还，使面板仍与输入卡片对齐；并额外用 `min()` 叠加顶层 `--dsh-chat-content-width` 上限，让面板右缘距把手内缘稳定留出 24px 安全带（窄栏下该把手宽度为 0，`min()` 自动回落为卡片列宽）。离线 Chrome 几何探针：对齐场景把手到面板间距 24.5px → 48.5px，位移 16px 的错位场景 8.5px → 32.5px，四个按钮 `elementFromPoint` 命中自身。
+- **跨线核对（本线专属）**：0.1.2 宿主几何与 0.1.5 线逐字一致，因此本条为 verbatim 移植而非改写——`dsh-v0.1.2-rc.1` 的 `ConversationRoot.module.css` 中 `.widthHandle` 为 `z-index: 8` / `width: min(40px, calc((100% - var(--dsh-chat-content-width)) / 2 - 24px - 24px))`，`[data-side='right']` 为 `left: calc(50% + var(--dsh-chat-content-width) / 2 + 24px)`，且 `--dsh-composer-card-max-width`（= 内容列宽 + 32px）/`--dsh-composer-side-clearance`（16px）/`--dsh-composer-dock-inset`（8px）取值与 0.1.5 线相同。修复注释中「条带内缘在内容列外 24px」的前提在 0.1.2 成立。
+- **顺带补 `publishConfig`**：本线此前没有 `publishConfig`，而本机全局 `registry` 指向只读镜像 `registry.npmmirror.com`，直接 `npm publish` 会失败。现按其他线补齐 `registry` / `access` / `tag: beta`，与 `dist-tag beta` 的既有指向一致。
+
 ## Unreleased
 
 ### 破坏性：仅支持 DSH 0.1.2+，完成 `dsh-client-runtime` 移除替换（0.2.11-beta.1）
