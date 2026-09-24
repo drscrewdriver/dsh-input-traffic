@@ -25,8 +25,8 @@ declare module '@deepseek-ai/cordis' {
     sessions: import('@deepseek-ai/dsh-api-session-controller/client').ISessions
     /** Locale dictionaries and bound translates. */
     locale: import('@deepseek-ai/dsh-client-locale/client').LocaleFace
-    /** Durable settings namespace binding. */
-    settingsScope: import('@deepseek-ai/dsh-client-ui-settings/client').SettingsScopeFace
+    /** Client configuration forms (0.1.7): per-entry form handles. */
+    configForms: import('@deepseek-ai/dsh-client-ui-settings/client').ConfigForms
     /** Outward conversation face (scope-addressed verbs). */
     conversation: import('@deepseek-ai/dsh-client-ui-conversation/client').IConversation
   }

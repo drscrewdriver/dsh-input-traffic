@@ -35,7 +35,7 @@ function makeCtx(): { ctx: ClientContext; registrations: Registration[] } {
     on: () => () => {},
     get: () => undefined,
     locale: { register: () => {}, bind: () => (key: string) => key },
-    settingsScope: { bind: () => ({ set: async () => {} }) },
+    configForms: { get: () => ({ set: async () => true }) },
     slots: {
       inject: (_name: string, fn: () => unknown) => {
         fn()

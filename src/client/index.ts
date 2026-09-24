@@ -75,7 +75,7 @@ function steerPrompt(actx: ClientContext, text: string): Promise<void> {
 }
 
 /** Services required by the browser half. */
-export const inject = ['slots', 'locale', 'sessions', 'conversation', 'settingsScope']
+export const inject = ['slots', 'locale', 'sessions', 'conversation', 'configForms']
 
 /**
  * Client plugin body: dictionaries, busy-Enter pinning, and the two slot
@@ -89,9 +89,11 @@ export function apply(ctx: ClientContext): void {
   // the official row is hidden. Pinning here also repairs a persisted `steer`
   // preference that would otherwise keep working invisibly behind the hidden
   // row. Best-effort: a memory-mode host simply accepts it locally.
-  const conversationSettings = ctx.settingsScope.bind<{ busyEnter: 'queue' | 'steer' }>({
-    namespace: CONVERSATION_SETTINGS_NAMESPACE,
-  })
+  // 0.1.7: cross-entry config writes go through configForms; the conversation
+  // entry id happens to equal the old settings namespace (`ui-conversation`).
+  const conversationSettings = ctx.configForms.get<{ busyEnter: 'queue' | 'steer' }>(
+    CONVERSATION_SETTINGS_NAMESPACE,
+  )
   void conversationSettings.set(BUSY_ENTER_FIELD, 'queue')
 
   // Shadow the official queue dock with the three-tier planning strip. The
@@ -109,10 +111,10 @@ export function apply(ctx: ClientContext): void {
       const conversation = actx.get('conversation')
       if (conversation === undefined) throw new Error('steer dock: conversation service unavailable')
       return {
-        updateQueue: (itemId, action) => conversation.updateQueue(itemId, action),
+        updateQueue: (itemId, action) => conversation.updateQueue(itemId as never, action),
         cancel: () => conversation.cancel(),
         send: (text) => conversation.send(text),
-        setDraft: (text) => { conversation.input.for(actx).actions.setDraft(text) },
+        setDraft: (text) => { conversation.input.for(actx).setDraft(text) },
         notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
       }
     },
@@ -130,13 +132,13 @@ export function apply(ctx: ClientContext): void {
       const conversation = actx.get('conversation')
       if (conversation === undefined) throw new Error('steer freeze: conversation service unavailable')
       return {
-        updateQueue: (itemId, action) => conversation.updateQueue(itemId, action),
+        updateQueue: (itemId, action) => conversation.updateQueue(itemId as never, action),
         cancel: () => conversation.cancel(),
         send: (text) => conversation.send(text),
         // safe_point 恢复经 conversation.send 排队到下一轮（本版契约无 steer prompt 面）。
         sendSteer: (text) => steerPrompt(actx, text),
         sessionId: String(sessionId),
-        setDraft: (text) => { conversation.input.for(actx).actions.setDraft(text) },
+        setDraft: (text) => { conversation.input.for(actx).setDraft(text) },
         notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
         // 冻结期间 raise composer block：composer 变 inert（回车/发送按钮全部失效），
         // 输入不会漏进对话；恢复时清除。block 不锁 input.right（恢复按钮仍可点）。
