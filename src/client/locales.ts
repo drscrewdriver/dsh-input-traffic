@@ -5,6 +5,9 @@ export const NS = 'steer'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'family.title': '输入流量',
+  'family.busyEnter': 'busy-Enter 行为（本插件接管）',
+  'family.desc': '普通回车在繁忙时进入排队（queue），不会打断当前回答；打断请用输入区的冻结/转向按钮。该行为由本插件自动接管，无需配置。',
   'queue.count': '{n} 条排队消息',
   'queue.edit': '编辑排队消息',
   'queue.edit.unsupported': '包含非文本内容，暂不支持编辑',
@@ -58,6 +61,9 @@ export const zh = {
 
 /** English dictionary (keys mirror zh). */
 export const en: Record<keyof typeof zh, string> = {
+  'family.title': 'Input Traffic',
+  'family.busyEnter': 'busy-Enter behavior (managed by this plugin)',
+  'family.desc': 'Plain Enter queues while busy instead of interrupting; use the freeze/steer control in the composer to interrupt. Managed automatically — nothing to configure.',
   'queue.count': '{n} queued messages',
   'queue.edit': 'Edit queued message',
   'queue.edit.unsupported': 'Contains non-text content; editing is unsupported',
@@ -111,6 +117,9 @@ export const en: Record<keyof typeof zh, string> = {
 
 /** Japanese dictionary (keys mirror zh). */
 export const ja: Record<keyof typeof zh, string> = {
+  'family.title': '入力トラフィック',
+  'family.busyEnter': 'busy-Enter 動作（本プラグインが管理）',
+  'family.desc': '通常の Enter はビジー時にキューへ入ります（割り込みなし）。割り込みは入力欄の凍結/ステアで。自動管理のため設定不要。',
   'queue.count': '{n} 件のキューイング済みメッセージ',
   'queue.edit': 'キューイング済みメッセージを編集',
   'queue.edit.unsupported': '非テキストコンテンツが含まれており、編集はサポートされていません',
@@ -164,6 +173,9 @@ export const ja: Record<keyof typeof zh, string> = {
 
 /** Korean dictionary (keys mirror zh). */
 export const ko: Record<keyof typeof zh, string> = {
+  'family.title': '입력 트래픽',
+  'family.busyEnter': 'busy-Enter 동작(이 플러그인이 관리)',
+  'family.desc': '일반 Enter는 사용 중일 때 큐에 들어가 현재 답변을 끊지 않습니다. 중단이 필요하면 입력 창의 동결/스티어 버튼을 사용하세요. 자동 관리되므로 설정이 없습니다.',
   'queue.count': '{n}개 대기열 메시지',
   'queue.edit': '대기열 메시지 편집',
   'queue.edit.unsupported': '비텍스트 콘텐츠가 포함되어 있어 편집이 지원되지 않습니다',

@@ -125,6 +125,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     name: K
     id?: string
     order?: number
+    /** 账本展示文字：字符串或读期求值的 thunk（family tab 栏使用）。 */
+    label?: string | (() => string)
     priority?: number
     locale?: string
     inject?: (...args: never[]) => unknown

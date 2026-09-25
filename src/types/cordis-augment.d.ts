@@ -17,6 +17,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 
+// 插件族共用设置 tab（dsh-thinking-levels 的顶级「起子插件设置」节声明该席位）。
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    'dsh-family.tab': { kind: 'list'; scope: 'root' }
+  }
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Slot registry: wait for a declaration, register, roll back with the fiber. */

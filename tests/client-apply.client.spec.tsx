@@ -52,12 +52,13 @@ function makeCtx(): { ctx: ClientContext; registrations: Registration[] } {
 }
 
 describe('client apply()', () => {
-  it('registers the three takeover slots', () => {
+  it('registers the takeover slots plus the family settings tab', () => {
     const { ctx, registrations } = makeCtx()
     apply(ctx)
     expect(registrations.map(r => r.name)).toEqual([
       'conversation.input.dock',
       'conversation.input.right',
+      'dsh-family.tab',
       'settings.general.item',
     ])
   })

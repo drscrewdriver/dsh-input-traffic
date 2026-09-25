@@ -3,6 +3,9 @@
 export declare const NS = "steer";
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export declare const zh: {
+    'family.title': string;
+    'family.busyEnter': string;
+    'family.desc': string;
     'queue.count': string;
     'queue.edit': string;
     'queue.edit.unsupported': string;

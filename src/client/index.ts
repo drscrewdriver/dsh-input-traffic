@@ -37,6 +37,7 @@ import { NS, en, zh } from './locales.ts'
 import { SteerQueueDock } from './steer-queue-dock.tsx'
 import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import { FreezeButton } from './freeze-button.tsx'
+import { InputTrafficFamilyCard } from './family-card.tsx'
 import { HideEnterRow } from './hide-enter-row.tsx'
 
 /** Durable conversation settings namespace owned by ui-conversation. */
@@ -148,6 +149,17 @@ export function apply(ctx: ClientContext): void {
       }
     },
   }, FreezeButton))
+
+  // 插件族共用设置 tab：只读状态卡（busyEnter 钉死展示 + 使用说明）。
+  // thinking-levels 缺席时 inject 静默等待，不阻塞客户端半。
+  ctx.slots.inject('dsh-family.tab', () => ctx.slots.register({
+    name: 'dsh-family.tab',
+    id: 'input-traffic',
+    order: 50,
+    label: () => ctx.locale.bind(NS)('family.title'),
+    locale: NS,
+    inject: () => ({ scope: conversationSettings }),
+  }, InputTrafficFamilyCard))
 
   // Hide the official busy-Enter settings row (null render wins the cell).
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
