@@ -385,6 +385,16 @@
   cursor: default;
 }
 
+.tierNow {
+  border-color: #e5484d;
+  background: rgba(229, 72, 77, 0.12);
+}
+
+.tierNext {
+  border-color: #e8a33d;
+  background: rgba(232, 163, 61, 0.12);
+}
+
 .tierLater {
   border-color: var(--dsw-alias-state-success-primary, #30a46c);
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #30a46c) 12%, transparent);
@@ -396,14 +406,17 @@
   border-radius: 50%;
 }
 
+/* Literal colors on purpose: custom skins (e.g. ui-skin-maid-atelier) may
+   redefine the state alias tokens, which washed the yellow dot out to
+   invisible. The tier dots are the plugin's own affordance and stay fixed. */
 .tierNow .dot {
-  background: var(--dsw-alias-state-error-primary, #e5484d);
+  background: #e5484d;
 }
 
 .tierNext .dot {
-  background: var(--dsw-alias-state-warn-primary, #e8a33d);
+  background: #e8a33d;
 }
 
 .tierLater .dot {
-  background: var(--dsw-alias-state-success-primary, #30a46c);
+  background: #30a46c;
 }
