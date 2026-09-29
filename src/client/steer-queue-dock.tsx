@@ -37,6 +37,23 @@ import {
 import { freezeStore, setTierAt, updatePendingAt, removePendingAt, movePending } from './freeze-store.ts'
 import css from './steer-queue-dock.module.css'
 
+/**
+ * Hide the official queue dock's per-row 插话发送 button: the yellow tier
+ * button on our rows already performs that insertion, and the official button
+ * only ever surfaces when our entry falls back. Attribute-selected by
+ * aria-label (the rendered text), so it survives the host's css-module
+ * hashing; zh + en labels cover both host locales.
+ */
+const HIDE_OFFICIAL_STEER_CSS =
+  '[aria-label="插话发送"],[aria-label="Steer queued message"]{display:none!important}'
+if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css="dsh-input-traffic/hide-official-steer"]') === null) {
+  const tag = document.createElement('style')
+  tag.dataset.plugin = 'dsh-input-traffic'
+  tag.dataset.pluginCss = 'dsh-input-traffic/hide-official-steer'
+  tag.textContent = HIDE_OFFICIAL_STEER_CSS
+  document.head.appendChild(tag)
+}
+
 /** One mutation accepted by the conversation queue verb. */
 export type SteerQueueAction =
   | { kind: 'edit'; content: readonly { type: 'text'; text: string }[] }
@@ -221,7 +238,7 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   }
 
   const saveEdit = async (): Promise<void> => {
-    if (editing === null || editing.text.trim() === '') return
+    if (editing === null || typeof editing.text !== 'string' || editing.text.trim() === '') return
     const itemId = editing.id
     const text = editing.text
     setBusy(itemId)
@@ -392,7 +409,12 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
    */
   const pullBackToComposer = async (row: { id: string; text: string | null }): Promise<void> => {
     if (row.text === null) return
-    setDraft(row.text)
+    try {
+      setDraft(row.text)
+    } catch {
+      notify('error', t('steer.pullBackFailed'))
+      return
+    }
     setBusy(row.id)
     try {
       await updateQueue(row.id, { kind: 'remove' })
@@ -789,7 +811,7 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
                           title={row.text === null ? t('queue.edit.unsupported') : undefined}
                           disabled={busy !== null || row.text === null}
                           onClick={() => {
-                            if (row.text !== null) setEditing({ id: row.id, text: row.text })
+                            if (row.text !== null) setEditing({ id: row.id, text: row.text ?? '' })
                           }}
                         >
                           <IconEditOutlineMedium size={14} />
