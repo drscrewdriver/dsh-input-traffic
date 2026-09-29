@@ -31,7 +31,12 @@ function mount(snap: ConversationSnapshot, options: { legacyOwner?: boolean } = 
   const setComposerBlock = vi.fn()
   const t = vi.fn((key: string) => key)
   const props = {
-    useSession: <T,>(selector: (s: ConversationSnapshot) => T): T => selector(snap),
+    useProjection: (key: 'inbox') => key === 'inbox'
+      ? {
+          'next-turn': snap.queue.filter(row => row.placement === 'queued'),
+          'next-step': snap.queue.filter(row => row.placement === 'steering'),
+        }
+      : undefined,
     ...(options.legacyOwner === true ? { session: snap } : {}),
     updateQueue,
     cancel,
