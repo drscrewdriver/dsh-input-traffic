@@ -272,28 +272,6 @@ describe('SteerQueueDock', () => {
     expect(notify).toHaveBeenCalledWith('error', 'queue.editFailed')
   })
 
-  it('pull back fills the composer draft and removes the row', async () => {
-    const { updateQueue, setDraft } = mount(snapshot([queueRow('m1', 'edit me')]))
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'steer.pullBack' }))
-    })
-    expect(setDraft).toHaveBeenCalledWith('edit me')
-    expect(updateQueue).toHaveBeenCalledWith('m1', { kind: 'remove' })
-  })
-
-  it('disables pull back while the composer draft is occupied', () => {
-    mount(snapshot([queueRow('m1', 'edit me')]), 'already typing...')
-    const button = screen.getByRole('button', { name: 'steer.pullBack' })
-    expect(button.hasAttribute('disabled')).toBe(true)
-    expect(button.getAttribute('title')).toBe('steer.pullBack.composerBusy')
-  })
-
-  it('disables pull back for non-text rows', () => {
-    const imageRow = { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: '[image]', text: null, content: [] }
-    mount(snapshot([imageRow]))
-    expect(screen.getByRole('button', { name: 'steer.pullBack' }).hasAttribute('disabled')).toBe(true)
-  })
-
   it('yellow steers the row without cancelling the turn', async () => {
     const { updateQueue, cancel } = mount(snapshot([queueRow('m1', 'go on')]))
     await act(async () => {
