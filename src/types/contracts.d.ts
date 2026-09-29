@@ -149,34 +149,6 @@ declare module '@deepseek-ai/dsh-client-locale/client' {
   }
 }
 
-declare module '@deepseek-ai/dsh-client-ui-settings/client' {
-  /** Snapshot of one durable namespace scope, as the settings card reads it. */
-  export interface SettingsScopeSnapshot<T> {
-    status: 'loading' | 'ready' | 'unavailable'
-    value: T | undefined
-    /** Composition base layer and raw user layer, exposed for override display. */
-    base: unknown
-    user: unknown
-    /** Write fence: the revision this snapshot was folded at. */
-    revision: number | undefined
-    writable: boolean
-    mode: 'host' | 'memory'
-  }
-
-  /** Durable namespace scope owner used to pin the busy-Enter field. */
-  export interface SettingsScope<T> {
-    getSnapshot(): SettingsScopeSnapshot<T>
-    subscribe(listener: () => void): () => void
-    set(field: string, value: unknown): Promise<void>
-    unset(field: string): Promise<void>
-  }
-
-  /** Context merge providing namespace binding. */
-  export interface SettingsScopeFace {
-    bind<T>(spec: { namespace: string; decode?: (section: unknown) => T | undefined }): SettingsScope<T>
-  }
-}
-
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   /** The outward conversation face (scope-addressed verbs). */
   export interface IConversation {
