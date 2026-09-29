@@ -2,6 +2,15 @@
 
 所有重要变更与 bug 修复记录于此。版本遵循语义化版本（`dsh plugin --profile web add dsh-input-traffic` 安装）。
 
+## 0.5.4 — 2026-09-29
+
+### 修复：0.1.7 线 devDeps 基线对齐 + dock 图标渲染崩溃
+
+- devDeps 三处陈旧钉版拉平到 0.1.7 线：`client-ui-primitives ^0.0.1-rc.1`（`^0.0.x` 永远装不到 0.1.x）、`client-store` / `util-workspace-path ^0.1.2-alpha.2`（预发布解析规则卡死）→ 全部 `^0.1.7-rc.1`（实装 rc.2）。
+- 源码跟进 primitives `*16`/`*14` 图标导出改名（0.1.7-rc.1 起只剩 `*Medium`/`*Regular` 族）：8 处改用 `*Medium`。
+- **此版本替换已发布 0.5.3 的坏 tarball**：0.5.3 的 bundle 外部引用了 primitives 0.1.7 中不存在的图标导出名，在真实 0.1.7 宿主上 dock 渲染即崩——陈旧 devDeps 钉版把它掩盖成构建期假绿。
+- 测试环境加固：宿主专属路径桩化 + micromark/mdast 栈显式 devDep + `react-dom` 钉 18（5 套件 59 用例全部真实执行）。
+
 ## 0.4.1 — 2026-09-20
 
 ### 修复：等待队列尾部按钮被「调整对话宽度」把手抢走点击

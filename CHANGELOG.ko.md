@@ -6,6 +6,15 @@
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
 
+## 0.5.4 — 2026-09-29
+
+### 수정: 0.1.7 라인 devDeps 기준 정렬 + dock 아이콘 렌더링 크래시
+
+- 낡은 devDeps 3건을 0.1.7 라인으로 정렬: `client-ui-primitives ^0.0.1-rc.1`(`^0.0.x`는 0.1.x에 도달 불가), `client-store` / `util-workspace-path ^0.1.2-alpha.2`(프리릴리스 해석 정체) → 모두 `^0.1.7-rc.1`(실설치 rc.2).
+- 소스도 primitives의 `*16`/`*14` 아이콘 export 개명(0.1.7-rc.1부터 `*Medium`/`*Regular` 계열만 존재)에 맞춰 8곳을 `*Medium`으로 변경.
+- **이 버전은 게시된 0.5.3의 깨진 tarball을 대체합니다**: 0.5.3의 bundle은 primitives 0.1.7에 존재하지 않는 아이콘 export를 외부 참조하여, 실 0.1.7 호스트에서 dock 렌더링이 즉시 크래시——낡은 devDeps 고정이 빌드 시점의 가짜 그린으로 가려져 있었습니다.
+- 테스트 환경 강화: 호스트 전용 경로 스텁 + micromark/mdast 스택 명시 devDep + `react-dom` 18 고정(5 스위트 59 케이스 모두 실실행).
+
 ## 0.2.8 — 2026-08-24
 
 ### 추가: 주야 모드 자동 적응

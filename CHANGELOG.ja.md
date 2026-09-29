@@ -6,6 +6,15 @@
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
 
+## 0.5.4 — 2026-09-29
+
+### 修正：0.1.7 ライン devDeps 基線の整合 + dock アイコン描画クラッシュ
+
+- 古い devDeps 3 件を 0.1.7 ラインに引き上げ：`client-ui-primitives ^0.0.1-rc.1`（`^0.0.x` は 0.1.x に到達不能）、`client-store` / `util-workspace-path ^0.1.2-alpha.2`（プレリリース解決の滞留）→ すべて `^0.1.7-rc.1`（実装 rc.2）。
+- ソース側も primitives の `*16`/`*14` アイコン export 改名（0.1.7-rc.1 から `*Medium`/`*Regular` 系のみ）に追従：8 か所を `*Medium` に変更。
+- **本バージョンは公開済み 0.5.3 の壊れた tarball を置き換える**：0.5.3 の bundle は primitives 0.1.7 に存在しないアイコン export を外部参照しており、実 0.1.7 ホストで dock 描画が即クラッシュする——陳腐な devDeps ピンがビルド時の偽装グリーンに隠していた。
+- テスト環境の堅牢化：ホスト専用パスのスタブ + micromark/mdast スタックの明示 devDep + `react-dom` を 18 にピン（5 スイート 59 ケースすべて実実行）。
+
 ## 0.2.8 — 2026-08-24
 
 ### 追加：日夜モード自動適応
