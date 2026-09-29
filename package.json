@@ -1,6 +1,6 @@
 {
   "name": "dsh-input-traffic",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "publishConfig": {
     "tag": "dsh-0.1.7"
   },
