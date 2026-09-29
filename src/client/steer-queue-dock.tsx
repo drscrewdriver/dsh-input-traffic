@@ -38,19 +38,21 @@ import { freezeStore, setTierAt, updatePendingAt, removePendingAt, movePending }
 import css from './steer-queue-dock.module.css'
 
 /**
- * Hide the official queue dock's per-row 插话发送 button: the yellow tier
- * button on our rows already performs that insertion, and the official button
- * only ever surfaces when our entry falls back. Attribute-selected by
- * aria-label (the rendered text), so it survives the host's css-module
- * hashing; zh + en labels cover both host locales.
+ * Suppress the OFFICIAL queue dock entirely: our shadowing entry owns the
+ * `queue` cell, so the official dock is only ever mounted as a crash fallback
+ * — and its per-row 插话发送 duplicates our yellow tier. Hide the whole
+ * container by its css-module class (the `_7yHdaG` hash is baked into the
+ * host build and stable across restarts), plus the aria-label match as a
+ * second net in case the host rehashes.
  */
-const HIDE_OFFICIAL_STEER_CSS =
+const HIDE_OFFICIAL_QUEUE_CSS =
+  '[class*="_7yHdaG_dock"]{display:none!important}' +
   '[aria-label="插话发送"],[aria-label="Steer queued message"]{display:none!important}'
 if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css="dsh-input-traffic/hide-official-steer"]') === null) {
   const tag = document.createElement('style')
   tag.dataset.plugin = 'dsh-input-traffic'
   tag.dataset.pluginCss = 'dsh-input-traffic/hide-official-steer'
-  tag.textContent = HIDE_OFFICIAL_STEER_CSS
+  tag.textContent = HIDE_OFFICIAL_QUEUE_CSS
   document.head.appendChild(tag)
 }
 
