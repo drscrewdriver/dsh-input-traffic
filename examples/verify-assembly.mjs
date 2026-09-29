@@ -81,7 +81,7 @@ try {
     && Array.isArray(exports_?.inject) && exports_?.inject.includes('slots'),
     exports_?.inject?.join(', '))
   check('inject declares conversation services', exports_?.inject?.includes('conversation')
-    && exports_?.inject?.includes('sessions') && exports_?.inject?.includes('settingsScope'),
+    && exports_?.inject?.includes('sessions') && exports_?.inject?.includes('configForms'),
     exports_?.inject?.join(', '))
   void bundled
 
