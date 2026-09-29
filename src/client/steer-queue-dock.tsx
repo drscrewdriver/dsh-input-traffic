@@ -46,8 +46,10 @@ import css from './steer-queue-dock.module.css'
  * second net in case the host rehashes.
  */
 const HIDE_OFFICIAL_QUEUE_CSS =
-  '[class*="_7yHdaG_dock"]{display:none!important}' +
-  '[aria-label="插话发送"],[aria-label="Steer queued message"]{display:none!important}'
+  // Class-based only: the official steer button and OUR yellow tier share the
+  // same rendered aria-label (插话发送) — an attribute rule would hide our
+  // own button too.
+  '[class*="_7yHdaG_dock"]{display:none!important}'
 if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css="dsh-input-traffic/hide-official-steer"]') === null) {
   const tag = document.createElement('style')
   tag.dataset.plugin = 'dsh-input-traffic'
@@ -131,6 +133,19 @@ export function resizeEditor(el: HTMLTextAreaElement): void {
 }
 
 /**
+ * Concatenate a queued row's text blocks; null when the row carries anything
+ * non-text (attachments) or no content — mirrors the host queue dock's own
+ * helper (ui-conversation client.js `textOf`). Wire rows do NOT carry a
+ * `.text` field; the text lives in `content` blocks.
+ */
+export function textOf(content: readonly { readonly type: string; readonly text?: string }[] | undefined): string | null {
+  if (content === undefined || content.length === 0) return null
+  if (!content.every(block => block.type === 'text')) return null
+  const joined = content.map(block => block.text ?? '').join('')
+  return joined === '' ? null : joined
+}
+
+/**
  * Queue strip with three-tier planning: one item renders directly; multiple
  * items default to a collapsible count header; an empty queue renders nothing.
  */
@@ -139,8 +154,10 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   // is the plain queue (green tier), `next-step` the steered band (yellow).
   // The session store never carried a `queue` field on released hosts.
   const inbox = useProjection('inbox')
-  const queue = useMemo(() => inbox?.['next-turn'] ?? [], [inbox])
-  const steering = useMemo(() => inbox?.['next-step'] ?? [], [inbox])
+  // Wire rows carry no `.text`; derive it from the content blocks, falling
+  // back to a declared text for fixture/local rows.
+  const queue = useMemo(() => (inbox?.['next-turn'] ?? []).map(row => ({ ...row, text: textOf(row.content) ?? row.text ?? null })), [inbox])
+  const steering = useMemo(() => (inbox?.['next-step'] ?? []).map(row => ({ ...row, text: textOf(row.content) ?? row.text ?? null })), [inbox])
   const running = useSession(s => s.running)
   // Parity with the official dock: a continuable subagent context still owns
   // a mutable queue; requiring strict null kept the whole action row hidden

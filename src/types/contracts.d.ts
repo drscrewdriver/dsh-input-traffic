@@ -57,7 +57,8 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   /** One wire-safe pending inbox row (projection 'inbox'; subset this plugin reads). */
   export interface InboxWireRow {
     readonly id: string
-    readonly text: string | null
+    readonly text?: string | null
+    readonly content?: readonly { readonly type: string; readonly text?: string }[]
     readonly source: { readonly kind: string; readonly rpcId?: string }
   }
 

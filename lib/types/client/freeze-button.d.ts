@@ -1,5 +1,5 @@
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
-import type { SteerQueueDockInjected } from './steer-queue-dock.tsx';
+import { type SteerQueueDockInjected } from './steer-queue-dock.tsx';
 /**
  * Full props of the composer-right entry.
  *
