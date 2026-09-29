@@ -27,14 +27,16 @@
 
 > **▼ DSH 版本适配**
 >
-> 本插件（compat/0.1.5 线，0.2.12-beta.1 起）**仅支持 DSH v0.1.5+**。
+> 本插件（**compat/0.2.0 线，0.6.0 起**）**仅支持 DSH 0.2.0 线**（`>=0.2.0-rc.1 <0.2.1-0`，npm dist-tag `dsh-0.2.0`）。
 >
 > | DSH 版本 | 状态 | 说明 |
 > | --- | --- | --- |
-> | ≥ 0.1.5-alpha.1 | ✅ 支持 | 面向 0.1.5-rc.1 / rc.2 验证（类型契约已对照 dsh-v0.1.5-rc.2） |
-> | < 0.1.5-alpha.1 | ⚠️ 不支持 | 请留在 main 线（0.2.11-beta.1，支持 0.1.2+）或更早版本 |
+> | ≥ 0.2.0-rc.1 且 < 0.2.1-0 | ✅ 支持 | 面向 0.2.0-rc.1 验证；宿主 peer 门槛强制校验该窗口 |
+> | 0.1.7 线 | → 换用 `dsh-0.1.7` dist-tag（0.5.3，compat/0.1.7 分支维护） |
+> | 0.1.5 线 | → 换用 `dsh-0.1.5` dist-tag（0.2.12-beta.1） |
+> | < 0.2.0-rc.1 或 ≥ 0.2.1-0 | ⚠️ 不支持 | 宿主 preflight 直接拒绝安装；0.2.1 起需重新适配 |
 >
-> - **分界点在 0.1.5**：Session V3（surface node）、dockkit Sidebar 重写、Lexical composer 是 0.1.5 的结构性变更。本插件的三个 slot 锚点（`conversation.input.dock` / `conversation.input.right` / `settings.general.item`）在 0.1.5 全部保留，服务面（`send` / `cancel` / `updateQueue` / `blocks.set`）无破坏记录，因此代码零结构改动，仅收窄支持分段。
+> - **0.2.0-rc.1 对插件 API 完全兼容 0.1.7**（manifest / settings 席位 / slot 机制 / 会话格式 V4 未动），服务面（`send` / `cancel` / `updateQueue` / `input.setDraft` / `input.notify`）无破坏记录。本线为**元数据换代**：peer/engines 换段、依赖树对 0.2.0 宿主重装，仅一处实配更新——`dsh-client-ui-primitives` 0.2.0 删除了图标导出的 `*14` / `*16` 尺寸后缀族，统一改用 `*Medium`（`IconProps.size` 显式像素行为不变，渲染尺寸不受影响）。
 > - **队列条位置**：注册 `order: 1000`，排在 `conversation.input.dock` 带内所有已知条目（todo 0 / goal 10 / 官方 queue 20 / dsh-perm-gate 提示 30）之后，紧贴输入卡片。DSH 没有 "last" 语义，这是约定而非结构性保证——第三方插件若注册更大的 `order` 仍可能插到它下面。
 
 > **▼ DSH 0.1.5 已知回归（宿主侧，非本插件 bug）**

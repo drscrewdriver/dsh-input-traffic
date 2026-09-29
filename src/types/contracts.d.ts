@@ -7,9 +7,11 @@
  * the real modules at runtime.
  *
  * These declarations mirror the harness sources at the anchors below for the
- * supported release segment `>=0.1.5-alpha.1 <0.2.0-0` — the DSH line with the
- * Session V3 surface nodes and the dockkit sidebar. Anchors were verified
- * against dsh-v0.1.5-rc.2 (2026-09-11). Every type the `dsh-client-runtime`
+ * supported release segment `>=0.2.0-rc.1 <0.2.1-0`. Anchors were verified
+ * against dsh-v0.1.5-rc.2 (2026-09-11); the 0.1.7 → 0.2.0-rc.1 range diff
+ * (261 commits) leaves the mirrored surfaces — session / session-controller
+ * contracts — untouched, and `tsc` for this line runs against the real
+ * 0.2.0-rc.1 client packages. Every type the `dsh-client-runtime`
  * deletion orphaned is re-homed to the package that owns it today, so the
  * plugin consumes the same public API the harness itself consumes. Members
  * are declared only where this plugin reads them, so a regression that reaches

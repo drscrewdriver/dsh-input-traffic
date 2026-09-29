@@ -2,6 +2,15 @@
 
 所有重要变更与 bug 修复记录于此。版本遵循语义化版本（`dsh plugin --profile web add dsh-input-traffic` 安装）。
 
+## 0.6.0 — 2026-09-29
+
+### DSH 0.2.0 适配（compat/0.2.0 线，dist-tag `dsh-0.2.0`）
+
+- **peer / engines 换段**：6 个 `@deepseek-ai/dsh-*` peer 与 `engines.dsh`（含 `dsh.plugin.json`）统一替换为 `>=0.2.0-rc.1 <0.2.1-0`——0.2.0-rc.1 对插件 API 完全兼容 0.1.7，0.2.1 起重新适配；9 个 `@deepseek-ai/dsh-*` devDependencies 同步换代到 `0.2.0-rc.1`（此前钉旧线会让 typecheck/build/test 对 0.1.x 假绿）。
+- **图标导出跟随 primitives 0.2.0**：`dsh-client-ui-primitives` 0.2.0 删除 `*14` / `*16` 尺寸后缀图标导出（`IconQueueOutline14` 等 8 个），统一改用 `*Medium` 变体；`size` 显式像素语义不变，渲染尺寸不受影响。
+- **测试环境对齐 primitives 0.2.0 零依赖发布形态**：primitives 0.2.0 的 barrel 以裸导入引用宿主侧 markdown/shiki 栈（自身零依赖声明）——不处理会让两个测试套件在 import 阶段崩溃、0 用例执行的假绿。测试侧以 Vite alias 桩掉宿主专属路径（shiki / katex / diff / anser / zustand / immer / simple-icons / @shikijs/*），micromark/mdast 栈因导入期真实执行改为直接 devDep；`react-dom` 显式钉 `^18.2.0` 防止 pnpm 自动补装 v19 与 react 18 撞车。修复后 59 用例全部真正执行并通过（与 0.1.7 线基线一致）。
+- **0.1.7 线用户**：请继续使用 `dsh-0.1.7` dist-tag（0.5.x），本线不回移。
+
 ## 0.4.1 — 2026-09-20
 
 ### 修复：等待队列尾部按钮被「调整对话宽度」把手抢走点击

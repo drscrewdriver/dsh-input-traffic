@@ -23,13 +23,16 @@
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
 
-> **▼ DSH version support** (compat/0.1.5 line, since 0.2.12-beta.1)
+> **▼ DSH version support** (**compat/0.2.0 line, since 0.6.0**)
+> This line supports **the DSH 0.2.0 series only** (`>=0.2.0-rc.1 <0.2.1-0`, npm dist-tag `dsh-0.2.0`).
 > | DSH version | Status | Notes |
 > | --- | --- | --- |
-> | ≥ 0.1.5-alpha.1 | ✅ Supported | Verified against 0.1.5-rc.1 / rc.2 (type contracts mirrored from dsh-v0.1.5-rc.2) |
-> | < 0.1.5-alpha.1 | ⚠️ Not supported | Stay on the `main` line (0.2.11-beta.1, DSH 0.1.2+) or older |
+> | ≥ 0.2.0-rc.1 and < 0.2.1-0 | ✅ Supported | Verified against 0.2.0-rc.1; the host peer gate enforces this window |
+> | 0.1.7 series | → Use the `dsh-0.1.7` dist-tag (0.5.3, maintained on the compat/0.1.7 branch) |
+> | 0.1.5 series | → Use the `dsh-0.1.5` dist-tag (0.2.12-beta.1) |
+> | < 0.2.0-rc.1 or ≥ 0.2.1-0 | ⚠️ Not supported | The host preflight rejects the install outright; re-adaptation required from 0.2.1 |
 >
-> - **The boundary is 0.1.5**: Session V3 (surface nodes), the dockkit Sidebar rewrite, and the Lexical composer are 0.1.5's structural changes. All three slot anchors this plugin shadows (`conversation.input.dock` / `conversation.input.right` / `settings.general.item`) survive in 0.1.5, and the service face (`send` / `cancel` / `updateQueue` / `blocks.set`) has no recorded break — so the code needs zero structural changes; only the supported segment is narrowed.
+> - **0.2.0-rc.1 is fully API-compatible with 0.1.7** (manifest / settings seats / slot mechanics / session format V4 untouched); the service face (`send` / `cancel` / `updateQueue` / `input.setDraft` / `input.notify`) has no recorded break. This line is a **metadata retarget**: peer/engines ranges and a dependency tree refreshed against the 0.2.0 host, plus one real code change — `dsh-client-ui-primitives` 0.2.0 removed the `*14` / `*16` size-suffix icon exports in favor of `*Medium` (explicit `IconProps.size` pixels behave as before; rendered sizes are unaffected).
 > - **Queue strip position**: registered with `order: 1000`, so it sorts after every known contributor of the `conversation.input.dock` band (todo 0 / goal 10 / official queue 20 / dsh-perm-gate notice 30) and sits directly on top of the composer card. DSH has no "last" slot semantics, so this is a convention rather than a structural guarantee — a third-party plugin registering a larger `order` could still land below it.
 
 > **▼ Known DSH 0.1.5 regressions (host-side, not plugin bugs)**

@@ -30,8 +30,9 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 // plugin boundary.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
-  IconCheckOutline16, IconChevronDownOutline14, IconChevronUpOutline14, IconCloseOutline16,
-  IconEditOutline16, IconQueueOutline14, IconRightUpOutline16, IconTrashOutline16, Tooltip,
+  IconCheckOutlineMedium, IconChevronDownOutlineMedium, IconChevronUpOutlineMedium,
+  IconCloseOutlineMedium, IconEditOutlineMedium, IconQueueOutlineMedium,
+  IconRightUpOutlineMedium, IconTrashOutlineMedium, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { freezeStore, setTierAt, updatePendingAt, removePendingAt, movePending } from './freeze-store.ts'
 import css from './steer-queue-dock.module.css'
@@ -429,13 +430,13 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
             disabled={queue.length <= 1 || interactionActive}
             onClick={() => { setCollapsed(value => !value) }}
           >
-            <span className={css.lead} aria-hidden><IconQueueOutline14 /></span>
+            <span className={css.lead} aria-hidden><IconQueueOutlineMedium /></span>
             {queue.length > 0 && (
               <span className={css.count}>{t('queue.count', { n: queue.length })}</span>
             )}
             {queue.length > 1 && (
               <span className={css.chevron} aria-hidden>
-                {expanded ? <IconChevronDownOutline14 /> : <IconChevronUpOutline14 />}
+                {expanded ? <IconChevronDownOutlineMedium /> : <IconChevronUpOutlineMedium />}
               </span>
             )}
           </button>
@@ -459,7 +460,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                 disabled={clearing || busy !== null || nothingPending}
                 onClick={armClear}
               >
-                <IconTrashOutline16 size={14} />
+                <IconTrashOutlineMedium size={14} />
                 <span className={css.clearLabel}>{confirmClear ? t('steer.clear.confirm') : t('steer.clear')}</span>
               </button>
             </Tooltip>
@@ -511,7 +512,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                     setDragOver(null)
                   }}
                 >
-                  <span className={css.lead} aria-hidden><IconQueueOutline14 /></span>
+                  <span className={css.lead} aria-hidden><IconQueueOutlineMedium /></span>
                   <SteerBadge tier={entry.tier === 'force' ? 'now' : entry.tier === 'safe_point' ? 'next' : 'later'} t={t} />
                   {editingFrozen
                     ? (
@@ -548,7 +549,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                             disabled={editing === null || editing.text.trim() === ''}
                             onClick={() => { void saveFrozenEdit(i) }}
                           >
-                            <IconCheckOutline16 size={14} />
+                            <IconCheckOutlineMedium size={14} />
                           </button>
                         </Tooltip>
                         <Tooltip label={t('queue.cancelEdit')} side="bottom" delayMs={500}>
@@ -558,7 +559,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                             aria-label={t('queue.cancelEdit')}
                             onClick={() => { setEditing(null) }}
                           >
-                            <IconCloseOutline16 size={14} />
+                            <IconCloseOutlineMedium size={14} />
                           </button>
                         </Tooltip>
                       </>
@@ -572,7 +573,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                             disabled={i === 0}
                             onClick={() => movePending(sid, i, i - 1)}
                           >
-                            <IconChevronUpOutline14 />
+                            <IconChevronUpOutlineMedium />
                           </button>
                         </Tooltip>
                         <Tooltip label={t('steer.moveDown')} side="bottom" delayMs={500} disabled={i === frozenPending.length - 1}>
@@ -583,7 +584,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                             disabled={i === frozenPending.length - 1}
                             onClick={() => movePending(sid, i, i + 1)}
                           >
-                            <IconChevronDownOutline14 />
+                            <IconChevronDownOutlineMedium />
                           </button>
                         </Tooltip>
                         <Tooltip label={t('queue.edit')} side="bottom" delayMs={500}>
@@ -593,7 +594,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                             aria-label={t('queue.edit')}
                             onClick={() => { setEditing({ id: `frozen:${i}`, text }) }}
                           >
-                            <IconEditOutline16 size={14} />
+                            <IconEditOutlineMedium size={14} />
                           </button>
                         </Tooltip>
                         <Tooltip label={t('queue.remove')} side="bottom" delayMs={500}>
@@ -603,7 +604,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                             aria-label={t('queue.remove')}
                             onClick={() => removePendingAt(sid, i)}
                           >
-                            <IconTrashOutline16 size={14} />
+                            <IconTrashOutlineMedium size={14} />
                           </button>
                         </Tooltip>
                         {/* Planned insertion tier: freezing pauses consumption,
@@ -684,7 +685,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                 setDragOver(null)
               }}
             >
-              {queue.length === 1 && <span className={css.lead} aria-hidden><IconQueueOutline14 /></span>}
+              {queue.length === 1 && <span className={css.lead} aria-hidden><IconQueueOutlineMedium /></span>}
               <SteerBadge tier={badgeFor('queued')} t={t} />
               {editing?.id === row.id
                 ? (
@@ -723,7 +724,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                           disabled={busy !== null || editing.text.trim() === ''}
                           onClick={() => { void saveEdit() }}
                         >
-                          <IconCheckOutline16 size={14} />
+                          <IconCheckOutlineMedium size={14} />
                         </button>
                       </Tooltip>
                       <Tooltip label={t('queue.cancelEdit')} side="bottom" delayMs={500}>
@@ -734,7 +735,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                           disabled={busy !== null}
                           onClick={() => { setEditing(null) }}
                         >
-                          <IconCloseOutline16 size={14} />
+                          <IconCloseOutlineMedium size={14} />
                         </button>
                       </Tooltip>
                     </>
@@ -750,7 +751,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                           disabled={busy !== null || frozen || reorderUnsupported}
                           onClick={() => { void reorder(row.id, -1) }}
                         >
-                          <IconChevronUpOutline14 />
+                          <IconChevronUpOutlineMedium />
                         </button>
                       </Tooltip>
                       <Tooltip label={t('steer.moveDown')} side="bottom" delayMs={500} disabled={frozen || reorderUnsupported}>
@@ -762,7 +763,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                           disabled={busy !== null || frozen || reorderUnsupported}
                           onClick={() => { void reorder(row.id, 1) }}
                         >
-                          <IconChevronDownOutline14 />
+                          <IconChevronDownOutlineMedium />
                         </button>
                       </Tooltip>
                       <Tooltip label={t('steer.pullBack')} side="bottom" delayMs={500} disabled={row.text === null || !composerEmpty}>
@@ -774,7 +775,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                           disabled={busy !== null || frozen || row.text === null || !composerEmpty}
                           onClick={() => { void pullBackToComposer(row) }}
                         >
-                          <IconRightUpOutline16 />
+                          <IconRightUpOutlineMedium />
                         </button>
                       </Tooltip>
                       <Tooltip label={t('queue.edit')} side="bottom" delayMs={500} disabled={row.text === null}>
@@ -788,7 +789,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                             if (row.text !== null) setEditing({ id: row.id, text: row.text })
                           }}
                         >
-                          <IconEditOutline16 size={14} />
+                          <IconEditOutlineMedium size={14} />
                         </button>
                       </Tooltip>
                       <Tooltip label={t('queue.remove')} side="bottom" delayMs={500}>
@@ -801,7 +802,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                             void applyAction(row.id, { kind: 'remove' }, t('queue.removeFailed'))
                           }}
                         >
-                          <IconTrashOutline16 size={14} />
+                          <IconTrashOutlineMedium size={14} />
                         </button>
                       </Tooltip>
                       <span className={css.plan} role="group" aria-label={t('steer.later.aria')}>
@@ -855,7 +856,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
           <ul className={css.steeringList} data-steering-list="">
             {steering.map(row => (
               <li key={row.id} className={css.row} data-tier={badgeFor('steering') ?? undefined}>
-                <span className={css.lead} aria-hidden><IconQueueOutline14 /></span>
+                <span className={css.lead} aria-hidden><IconQueueOutlineMedium /></span>
                 <SteerBadge tier={badgeFor('steering')} t={t} />
                 <span className={css.preview}>{row.preview}</span>
                 <div className={css.actions}>
