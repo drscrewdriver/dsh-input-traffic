@@ -32,7 +32,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
   IconCheckOutlineMedium, IconChevronDownOutlineMedium, IconChevronUpOutlineMedium,
   IconCloseOutlineMedium, IconEditOutlineMedium, IconQueueOutlineMedium,
-  IconRightUpOutlineMedium, IconTrashOutlineMedium, Tooltip,
+  IconTrashOutlineMedium, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { freezeStore, setTierAt, updatePendingAt, removePendingAt, movePending } from './freeze-store.ts'
 import css from './steer-queue-dock.module.css'
@@ -216,11 +216,6 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   // Reordering rebuilds the queue by re-sending texts; non-text rows cannot
   // be re-sent, so sorting is disabled while any such row is queued.
   const reorderUnsupported = queue.some(row => row.text === null)
-  // Pull-back-to-composer is only offered when the composer draft is empty:
-  // the pulled message back-fills the draft, so an occupied composer would be
-  // overwritten. Steered (yellow/red) rows never offer it — once inserted,
-  // they are not deeply re-edited.
-  const composerEmpty = input.draft.trim() === ''
 
   const applyAction = async (
     itemId: string,
@@ -402,29 +397,6 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
     }
     updatePendingAt(sid, index, text)
     setEditing(null)
-  }
-
-  /**
-   * Pull one queued row back into the composer draft for editing: the text
-   * back-fills the input box and the row leaves the queue; the user edits and
-   * resubmits it as a fresh message.
-   */
-  const pullBackToComposer = async (row: { id: string; text: string | null }): Promise<void> => {
-    if (row.text === null) return
-    try {
-      setDraft(row.text)
-    } catch {
-      notify('error', t('steer.pullBackFailed'))
-      return
-    }
-    setBusy(row.id)
-    try {
-      await updateQueue(row.id, { kind: 'remove' })
-    } catch {
-      notify('error', t('steer.pullBackFailed'))
-    } finally {
-      setBusy(current => current === row.id ? null : current)
-    }
   }
 
   const clearAll = async (): Promise<void> => {
@@ -791,18 +763,6 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
                           onClick={() => { void reorder(row.id, 1) }}
                         >
                           <IconChevronDownOutlineMedium />
-                        </button>
-                      </Tooltip>
-                      <Tooltip label={t('steer.pullBack')} side="bottom" delayMs={500} disabled={row.text === null || !composerEmpty}>
-                        <button
-                          type="button"
-                          className={css.action}
-                          aria-label={t('steer.pullBack')}
-                          title={row.text === null ? t('steer.pullBack.unsupported') : !composerEmpty ? t('steer.pullBack.composerBusy') : undefined}
-                          disabled={busy !== null || frozen || row.text === null || !composerEmpty}
-                          onClick={() => { void pullBackToComposer(row) }}
-                        >
-                          <IconRightUpOutlineMedium />
                         </button>
                       </Tooltip>
                       <Tooltip label={t('queue.edit')} side="bottom" delayMs={500} disabled={row.text === null}>
