@@ -6,6 +6,15 @@
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
 
+## 0.6.0 — 2026-09-29
+
+### DSH 0.2.0 대응(compat/0.2.0 라인, dist-tag `dsh-0.2.0`)
+
+- **peer / engines 교체**: `@deepseek-ai/dsh-*` peer 6건과 `engines.dsh`(`dsh.plugin.json` 포함)를 일괄 `>=0.2.0-rc.1 <0.2.1-0`로——0.2.0-rc.1은 0.1.7과 완전 API 호환, 0.2.1부터 재대응; `@deepseek-ai/dsh-*` devDependencies 9건도 `0.2.0-rc.1`로 세대 교체(구라인 고정 상태로는 typecheck/build/test가 0.1.x 대상 가짜 그린이 됨).
+- **아이콘 export는 primitives 0.2.0에 맞춤**: `dsh-client-ui-primitives` 0.2.0은 `*14` / `*16` 크기 접미 아이콘 export(`IconQueueOutline14` 등 8개)를 삭제하여 `*Medium` 계열로 통일; `size`의 명시적 픽셀 의미는 불변, 렌더링 크기에 영향 없음.
+- **테스트 환경을 primitives 0.2.0 제로의존 릴리스 형태에 정렬**: primitives 0.2.0의 barrel은 호스트 측 markdown/shiki 스택을 베어 import함(자신은 제로의존 선언)——방치하면 2 스위트가 import 단계에서 크래시되고 0 케이스 실행 가짜 그린이 됨. 테스트 측은 Vite alias로 호스트 전용 경로를 스텁(shiki / katex / diff / anser / zustand / immer / simple-icons / @shikijs/*), micromark/mdast 스택은 import 시 실실행되므로 직접 devDep화; `react-dom`을 명시 `^18.2.0` 고정해 pnpm 자동 보완의 v19와 react 18 충돌 방지. 수정 후 59 케이스 모두 실실행 통과(0.1.7 라인 기준과 일치).
+- **0.1.7 라인 사용자**: 계속 `dsh-0.1.7` dist-tag(0.5.x)를 사용하십시오. 본 라인에는 백포트하지 않습니다.
+
 ## 0.2.8 — 2026-08-24
 
 ### 추가: 주야 모드 자동 적응

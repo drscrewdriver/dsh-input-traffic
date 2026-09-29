@@ -6,6 +6,15 @@
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
 
+## 0.6.0 — 2026-09-29
+
+### DSH 0.2.0 対応（compat/0.2.0 ライン、dist-tag `dsh-0.2.0`）
+
+- **peer / engines 入れ替え**：`@deepseek-ai/dsh-*` peer 6 件と `engines.dsh`（`dsh.plugin.json` 含む）を一括で `>=0.2.0-rc.1 <0.2.1-0` に——0.2.0-rc.1 は 0.1.7 と完全 API 互換、0.2.1 から再対応；`@deepseek-ai/dsh-*` devDependencies 9 件も `0.2.0-rc.1` に世代交代（旧線ピンのままだと typecheck/build/test が 0.1.x に対する偽グリーンになる）。
+- **アイコン export は primitives 0.2.0 に追従**：`dsh-client-ui-primitives` 0.2.0 は `*14` / `*16` サイズ接尾アイコン export（`IconQueueOutline14` 等 8 個）を削除したため、`*Medium` 系に統一；`size` の明示ピクセル意味は不変、描画サイズに影響なし。
+- **テスト環境を primitives 0.2.0 のゼロ依存リリース形態に整合**：primitives 0.2.0 の barrel はホスト側 markdown/shiki スタックを裸 import する（自身はゼロ依存宣言）——放置すると 2 スイートが import 段階でクラッシュし 0 ケース実行の偽グリーンに。テスト側は Vite alias でホスト専用パスをスタブ（shiki / katex / diff / anser / zustand / immer / simple-icons / @shikijs/*）、micromark/mdast スタックは import 時に実際実行されるため直接 devDep 化；`react-dom` を明示 `^18.2.0` にピンし pnpm 自動補完の v19 と react 18 の衝突を防止。修正後 59 ケースすべて実実行でパス（0.1.7 線基準と一致）。
+- **0.1.7 線ユーザー**：引き続き `dsh-0.1.7` dist-tag（0.5.x）を使用してください。本線にはバックポートしません。
+
 ## 0.2.8 — 2026-08-24
 
 ### 追加：日夜モード自動適応
