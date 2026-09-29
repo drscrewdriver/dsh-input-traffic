@@ -2,6 +2,16 @@
 
 所有重要变更与 bug 修复记录于此。版本遵循语义化版本（`dsh plugin --profile web add dsh-input-traffic` 安装）。
 
+## 0.6.1 — 2026-09-30
+
+### 修复：队列行改读 inbox 投影（真实宿主渲染修复）
+
+- 真实宿主的排队行不在会话快照上：组件改从 useProjection('inbox') 读取（next-turn=排队/绿档，next-step=插话/黄档），与官方 QueueDock 同源。此前读取的 s.queue 为镜像自造字段，行渲染必崩并回退官方队列。
+- queueMutable 与官方判定对齐（continuable 子代理上下文亦可操作）。
+- 移除真机上失效的「打回输入框」按钮；黄色档位是唯一插话入口。
+- 行文本改由 content 块派生（textOf，对齐官方）；三色圆点固定字面量配色（自定义皮肤重定义 warn 别名会洗掉黄色）。
+- CSS 压制官方 QueueDock 容器；修复 verify-assembly 陈旧断言（settingsScope → configForms）。
+
 ## 0.6.0 — 2026-09-29
 
 ### DSH 0.2.0 适配（compat/0.2.0 线，dist-tag `dsh-0.2.0`）
