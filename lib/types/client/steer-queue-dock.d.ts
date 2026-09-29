@@ -60,6 +60,16 @@ export declare function badgeFor(placement: 'queued' | 'steering' | 'context'): 
  */
 export declare function resizeEditor(el: HTMLTextAreaElement): void;
 /**
+ * Concatenate a queued row's text blocks; null when the row carries anything
+ * non-text (attachments) or no content — mirrors the host queue dock's own
+ * helper (ui-conversation client.js `textOf`). Wire rows do NOT carry a
+ * `.text` field; the text lives in `content` blocks.
+ */
+export declare function textOf(content: readonly {
+    readonly type: string;
+    readonly text?: string;
+}[] | undefined): string | null;
+/**
  * Queue strip with three-tier planning: one item renders directly; multiple
  * items default to a collapsible count header; an empty queue renders nothing.
  */

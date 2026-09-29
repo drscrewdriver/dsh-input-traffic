@@ -20,7 +20,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { freezeStore } from './freeze-store.ts'
 import type { FrozenTier } from './freeze-store.ts'
-import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
+import { textOf, type SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import { sessionGuardResume, sessionGuardStopNextTurn } from './session-guard-bridge.ts'
 import css from './freeze-button.module.css'
 
@@ -53,12 +53,16 @@ export function FreezeButton({ useProjection, updateQueue, cancel, send, sendSte
     // Steered rows keep their next intent as a safe_point plan for resume.
     const steeredIds = new Set((inbox?.['next-step'] ?? []).map(row => row.id))
     // Store order first (next-turn), then the steered band — matching the
-    // pre-projection queue ordering the resume path replays.
-    const rows = [...(inbox?.['next-turn'] ?? []), ...(inbox?.['next-step'] ?? [])]
+    // pre-projection queue ordering the resume path replays. Wire rows carry
+    // no `.text`; derive it from the content blocks like the dock does.
+    const rows = [...(inbox?.['next-turn'] ?? []), ...(inbox?.['next-step'] ?? [])].map(row => ({
+      ...row,
+      text: textOf(row.content) ?? row.text ?? null,
+    }))
     // Preserve plain-text copies; non-text rows cannot be re-sent and are
     // released by the freeze (documented limitation).
     const pending: { text: string; tier: FrozenTier }[] = rows.flatMap(row =>
-      row.text === null ? [] : [{ text: row.text, tier: steeredIds.has(row.id) ? 'safe_point' : 'queue' }],
+      typeof row.text === 'string' && row.text !== '' ? [{ text: row.text, tier: steeredIds.has(row.id) ? 'safe_point' : 'queue' }] : [],
     )
     // Detach every pending row: the running turn finishes naturally, then the
     // driver finds no pending work and stops.
