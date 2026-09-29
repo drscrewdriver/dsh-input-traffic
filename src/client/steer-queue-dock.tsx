@@ -141,7 +141,10 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   const queue = useMemo(() => inbox?.['next-turn'] ?? [], [inbox])
   const steering = useMemo(() => inbox?.['next-step'] ?? [], [inbox])
   const running = useSession(s => s.running)
-  const queueMutable = useSession(s => s.subagent === null)
+  // Parity with the official dock: a continuable subagent context still owns
+  // a mutable queue; requiring strict null kept the whole action row hidden
+  // whenever a subagent address was attached.
+  const queueMutable = useSession(s => s.subagent === null || s.subagent.address.mode === 'continuable')
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
