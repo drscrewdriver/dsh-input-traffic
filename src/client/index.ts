@@ -85,6 +85,12 @@ export const inject = ['slots', 'locale', 'sessions', 'conversation', 'configFor
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-input-traffic: dictionaries')
+  // Family-tab label translator, captured EAGERLY: the family holder evaluates
+  // `label()` during its own render; a lazy ctx.locale access inside the thunk
+  // is a cross-context accessor call and can throw there (killing the whole
+  // tab ledger projection). bind() returns a live binder, locale switches are
+  // still followed.
+  const tFamily = ctx.locale.bind(NS)
 
   // Take over the busy-Enter behavior: plain Enter stays queue-later while
   // the official row is hidden. Pinning here also repairs a persisted `steer`
@@ -156,7 +162,7 @@ export function apply(ctx: ClientContext): void {
     name: 'dsh-family.tab',
     id: 'input-traffic',
     order: 50,
-    label: () => ctx.locale.bind(NS)('family.title'),
+    label: () => tFamily('family.title'),
     locale: NS,
     inject: () => ({ scope: conversationSettings }),
   }, InputTrafficFamilyCard))
