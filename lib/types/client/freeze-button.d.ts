@@ -8,10 +8,10 @@ import type { SteerQueueDockInjected } from './steer-queue-dock.tsx';
  * the session standard kit is shared, so the type declares exactly that —
  * reading `session`/`input` off this slot is a compile error, not a crash.
  */
-export type FreezeButtonProps = Pick<PropsRuntime<'conversation.input.right'>, 'useSession' | 'sessionId'> & SteerQueueDockInjected & PropsLocale<'steer'>;
+export type FreezeButtonProps = Pick<PropsRuntime<'conversation.input.right'>, 'useProjection' | 'sessionId'> & SteerQueueDockInjected & PropsLocale<'steer'>;
 /**
  * Freeze/resume toggle for the peak-hour scenario.
  * @param props - slot props; the session snapshot drives the detach list.
  */
-export declare function FreezeButton({ useSession, updateQueue, cancel, send, sendSteer, sessionId, setComposerBlock, notify, t }: FreezeButtonProps): import("react").JSX.Element;
+export declare function FreezeButton({ useProjection, updateQueue, cancel, send, sendSteer, sessionId, setComposerBlock, notify, t }: FreezeButtonProps): import("react").JSX.Element;
 //# sourceMappingURL=freeze-button.d.ts.map

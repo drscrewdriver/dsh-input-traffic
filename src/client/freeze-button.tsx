@@ -33,7 +33,7 @@ import css from './freeze-button.module.css'
  * reading `session`/`input` off this slot is a compile error, not a crash.
  */
 export type FreezeButtonProps =
-  Pick<PropsRuntime<'conversation.input.right'>, 'useSession' | 'sessionId'>
+  Pick<PropsRuntime<'conversation.input.right'>, 'useProjection' | 'sessionId'>
   & SteerQueueDockInjected
   & PropsLocale<'steer'>
 
@@ -41,21 +41,24 @@ export type FreezeButtonProps =
  * Freeze/resume toggle for the peak-hour scenario.
  * @param props - slot props; the session snapshot drives the detach list.
  */
-export function FreezeButton({ useSession, updateQueue, cancel, send, sendSteer, sessionId, setComposerBlock, notify, t }: FreezeButtonProps) {
+export function FreezeButton({ useProjection, updateQueue, cancel, send, sendSteer, sessionId, setComposerBlock, notify, t }: FreezeButtonProps) {
   // The freeze store is keyed by session: read the owning session's snapshot.
   const sid = sessionId ?? ''
   const { frozen } = useSyncExternalStore(freezeStore.subscribe, () => freezeStore.getSnapshot(sid))
-  const queue = useSession(s => s.queue)
+  const inbox = useProjection('inbox')
 
   const freeze = async (): Promise<void> => {
     // Detach every pending input row — queued (next-turn) and already-steered
     // (next-step) alike — so nothing stays in the live queue while frozen.
     // Steered rows keep their next intent as a safe_point plan for resume.
-    const rows = queue.filter(row => row.placement === 'queued' || row.placement === 'steering')
+    const steeredIds = new Set((inbox?.['next-step'] ?? []).map(row => row.id))
+    // Store order first (next-turn), then the steered band — matching the
+    // pre-projection queue ordering the resume path replays.
+    const rows = [...(inbox?.['next-turn'] ?? []), ...(inbox?.['next-step'] ?? [])]
     // Preserve plain-text copies; non-text rows cannot be re-sent and are
     // released by the freeze (documented limitation).
     const pending: { text: string; tier: FrozenTier }[] = rows.flatMap(row =>
-      row.text === null ? [] : [{ text: row.text, tier: row.placement === 'steering' ? 'safe_point' : 'queue' }],
+      row.text === null ? [] : [{ text: row.text, tier: steeredIds.has(row.id) ? 'safe_point' : 'queue' }],
     )
     // Detach every pending row: the running turn finishes naturally, then the
     // driver finds no pending work and stops.

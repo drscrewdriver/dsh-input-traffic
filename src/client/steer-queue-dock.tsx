@@ -114,10 +114,13 @@ export function resizeEditor(el: HTMLTextAreaElement): void {
  * Queue strip with three-tier planning: one item renders directly; multiple
  * items default to a collapsible count header; an empty queue renders nothing.
  */
-export function SteerQueueDock({ sessionId, useSession, input, updateQueue, cancel, send, setDraft, notify, t }: SteerQueueDockProps) {
-  const inbox = useSession(s => s.queue)
-  const queue = useMemo(() => inbox.filter(row => row.placement === 'queued'), [inbox])
-  const steering = useMemo(() => inbox.filter(row => row.placement === 'steering'), [inbox])
+export function SteerQueueDock({ sessionId, useSession, useProjection, input, updateQueue, cancel, send, setDraft, notify, t }: SteerQueueDockProps) {
+  // Queue rows live in the session's `inbox` PROJECTION (0.1.7+): `next-turn`
+  // is the plain queue (green tier), `next-step` the steered band (yellow).
+  // The session store never carried a `queue` field on released hosts.
+  const inbox = useProjection('inbox')
+  const queue = useMemo(() => inbox?.['next-turn'] ?? [], [inbox])
+  const steering = useMemo(() => inbox?.['next-step'] ?? [], [inbox])
   const running = useSession(s => s.running)
   const queueMutable = useSession(s => s.subagent === null)
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
@@ -710,7 +713,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
                     }}
                   />
                 )
-                : <span className={css.preview}>{row.preview}</span>}
+                : <span className={css.preview}>{row.text}</span>}
               {queueMutable && <div className={css.actions}>
                 {editing?.id === row.id
                   ? (
@@ -857,7 +860,7 @@ export function SteerQueueDock({ sessionId, useSession, input, updateQueue, canc
               <li key={row.id} className={css.row} data-tier={badgeFor('steering') ?? undefined}>
                 <span className={css.lead} aria-hidden><IconQueueOutlineMedium /></span>
                 <SteerBadge tier={badgeFor('steering')} t={t} />
-                <span className={css.preview}>{row.preview}</span>
+                <span className={css.preview}>{row.text}</span>
                 <div className={css.actions}>
                   <Tooltip label={t('steer.revoke')} side="bottom" delayMs={500} disabled={row.text === null}>
                     <button

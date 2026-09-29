@@ -31,6 +31,12 @@ function mount(snap: ConversationSnapshot, draft = '') {
   })
   const props = {
     useSession: <T,>(selector: (s: ConversationSnapshot) => T): T => selector(snap),
+    useProjection: (key: 'inbox') => key === 'inbox'
+      ? {
+          'next-turn': snap.queue.filter(row => row.placement === 'queued'),
+          'next-step': snap.queue.filter(row => row.placement === 'steering'),
+        }
+      : undefined,
     sessionId: 's1' as string,
     input: { draft, phase: 'plain' as const, queue: snap.queue },
     updateQueue,

@@ -37,29 +37,32 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   import type { Context } from '@deepseek-ai/cordis'
   import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
-  /** One transient inbox occurrence from the authoritative queue snapshot. */
-  export interface QueuedMessage {
-    readonly id: string
-    readonly messageId: string
-    readonly placement: 'queued' | 'steering' | 'context'
-    readonly rpcId?: string
-    readonly content: readonly unknown[]
-    readonly preview: string
-    readonly text: string | null
-  }
-
   /**
    * Immutable Session lifecycle and control snapshot, consumed by the session
-   * standard kit. Only the members this plugin reads are declared.
+   * standard kit. Only the members this plugin reads are declared. Queue rows
+   * are NOT on the snapshot — released hosts expose them only through the
+   * `inbox` projection (`useProjection('inbox')` → next-turn/next-step).
    */
   export interface SessionSnapshot {
     readonly sessionId: SessionId
-    readonly queue: readonly QueuedMessage[]
     readonly running: boolean
     readonly subagent: {
       readonly address: { readonly mode: string }
       readonly parentAvailable?: boolean
     } | null
+  }
+
+  /** One wire-safe pending inbox row (projection 'inbox'; subset this plugin reads). */
+  export interface InboxWireRow {
+    readonly id: string
+    readonly text: string | null
+    readonly source: { readonly kind: string; readonly rpcId?: string }
+  }
+
+  /** Pending agent input projection, keyed by delivery band. */
+  export interface InboxWireState {
+    readonly 'next-turn': readonly InboxWireRow[]
+    readonly 'next-step': readonly InboxWireRow[]
   }
 
   /** Session registry: scope resolution for session-addressed services. */
@@ -77,7 +80,7 @@ declare module '@deepseek-ai/dsh-client-store' {
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   import type { SessionId } from '@deepseek-ai/dsh-session/types'
   import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
-  import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
+  import type { SessionSnapshot, InboxWireState } from '@deepseek-ai/dsh-api-session-controller/client'
 
   /**
    * Owner share of the input-region slots. Only the consumed member is
@@ -104,6 +107,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   /** Session-standard kit delivered to session-scope slot components. */
   export interface SessionStandardProps {
     useSession: SnapshotSelectorHook<SessionSnapshot>
+    /** Key-addressed projection read: `useProjection('inbox')` → next-turn/next-step rows. */
+    useProjection: (key: 'inbox') => InboxWireState | undefined
     sessionId: SessionId
   }
 
