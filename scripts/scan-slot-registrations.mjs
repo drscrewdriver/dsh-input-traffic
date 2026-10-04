@@ -21,8 +21,7 @@
  * 输出（stdout 摘要 + --json 落盘）：
  *   { hostRoot, scannedFiles, slots: { [name]: { present, files } }, externalProvider: {...} }
  */
-import { spawnSync } from 'node:child_process'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { join, sep } from 'node:path'
 
 /** 本插件消费的四个槽位；前三个是宿主自有槽（功能下限），family 是跨插件槽。 */
@@ -41,34 +40,43 @@ const jsonOut = args.includes('--json') ? args[args.indexOf('--json') + 1] : und
 const baselineFile = args.includes('--baseline') ? args[args.indexOf('--baseline') + 1] : undefined
 const pattern = args.includes('--pattern') ? new RegExp(args[args.indexOf('--pattern') + 1]) : undefined
 
-const pkgsRoot = join(hostRoot, 'node_modules', '@deepseek-ai')
+const pkgsRoot = hostRoot // 扫描根：listFiles 内部同时取 node_modules/.pnpm 虚拟 store 与顶层 @deepseek-ai
 
-/** rg 优先；回退纯 Node。统一返回相对正斜杠路径列表。
- * 两个旗标都是血泪坑，必须原样保留：
- * - `--path-separator=/`：Windows ripgrep 打印反斜杠路径，按 `/` 的后续处理会静默清空；
- * - `--no-ignore -L`：rg 默认吃 .gitignore（node_modules 被忽略 → 零输出）且
- *   不跟符号链接目录（pnpm 树的 @deepseek-ai/* 全是链接）——缺一个就扫空。
- * rg 零命中时回退 Node 遍历（statSync 跟链接），同一过滤语义。 */
-function listFiles(root) {
-  const rg = spawnSync('rg', ['--path-separator=/', '--no-ignore', '--hidden', '-L', '--files', root],
-    { encoding: 'utf8', windowsHide: true })
-  if (rg.status === 0 && rg.stdout.trim()) {
-    return rg.stdout.trim().split('\n').filter((f) => SCAN_EXT.test(f) && !f.includes('/.ignored'))
-  }
+/** 遍历宿主依赖树，返回 @deepseek-ai 段下的相对正斜杠路径列表。
+ * **纯 Node 遍历，不用 rg --files**：三个实测坑——rg 默认吃 .gitignore
+ * （node_modules 被忽略 → 零输出）；`-L` 在 Windows junction（pnpm 的链接
+ * 形态）上不保证下行；**pnpm 布局下宿主的 client 包根本不在顶层**
+ * `node_modules/@deepseek-ai`（宿主 tgz 是 file:/registry 依赖，其传递依赖
+ * 全在虚拟 store `node_modules/.pnpm/<pkg>@<v>/node_modules/@deepseek-ai/`，
+ * 沙箱实测顶层只有 cordis/dsh 数项）——所以根要同时取 `.pnpm` store 与顶层。
+ * statSync 跟随 junction，realpath 去重防重复读；`.ignored_*` 是 pnpm 的
+ * 忽略 peer 残尸（旧版本拷贝），扫它会出陈旧假阳性，排除。
+ * 这是 tidy-display 原型 `--path-separator=/` 修复的根治版：不做路径分隔符
+ * 假设，坑面消失。 */
+function listFiles(hostRoot) {
+  const nm = join(hostRoot, 'node_modules')
+  const roots = [join(nm, '.pnpm'), join(nm, '@deepseek-ai')].filter((p) => existsSync(p))
   const out = []
+  const seen = new Set()
   const walk = (dir) => {
     let entries
     try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return }
     for (const entry of entries) {
       const p = join(dir, entry.name)
-      const isDir = statSync(p, { throwIfNoEntry: false })?.isDirectory() ?? false
-      if (isDir) walk(p)
-      else if (SCAN_EXT.test(entry.name) && !p.replaceAll(sep, '/').includes('/.ignored')) {
-        out.push(p.split(sep).join('/'))
+      let real
+      try { real = realpathSync(p) } catch { continue } // stat 级跟随 junction/symlink
+      if (seen.has(real)) continue
+      seen.add(real)
+      let st
+      try { st = statSync(p) } catch { continue }
+      const norm = p.replaceAll(sep, '/')
+      if (st.isDirectory()) walk(p)
+      else if (SCAN_EXT.test(entry.name) && norm.includes('/@deepseek-ai') && !norm.includes('/.ignored')) {
+        out.push(norm)
       }
     }
   }
-  walk(root)
+  for (const root of roots) walk(root)
   return out
 }
 
