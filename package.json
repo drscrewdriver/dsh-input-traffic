@@ -21,10 +21,12 @@
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/",
+    "locale",
     "cordis.patch.yml",
     "dsh.plugin.json",
     "README.md",

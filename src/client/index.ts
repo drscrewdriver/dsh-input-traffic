@@ -37,7 +37,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { NS, en, zh } from './locales.ts'
+import { NS, dictionaries } from './locales.ts'
 import { SteerQueueDock } from './steer-queue-dock.tsx'
 import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import { FreezeButton } from './freeze-button.tsx'
@@ -89,7 +89,7 @@ export const inject = ['slots', 'locale', 'sessions', 'conversation', 'configFor
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-input-traffic: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, dictionaries), 'dsh-input-traffic: dictionaries')
   // Family-tab label translator, captured EAGERLY: the family holder evaluates
   // `label()` during its own render; a lazy ctx.locale access inside the thunk
   // is a cross-context accessor call and can throw there (killing the whole

@@ -62,6 +62,18 @@ export declare const en: Record<keyof typeof zh, string>;
 export declare const ja: Record<keyof typeof zh, string>;
 /** Korean dictionary (keys mirror zh). */
 export declare const ko: Record<keyof typeof zh, string>;
+/** French dictionary (keys mirror zh). */
+export declare const fr: Record<keyof typeof zh, string>;
+/** German dictionary (keys mirror zh). */
+export declare const de: Record<keyof typeof zh, string>;
+/** Italian dictionary (keys mirror zh). */
+export declare const it: Record<keyof typeof zh, string>;
+/** Russian dictionary (keys mirror zh). */
+export declare const ru: Record<keyof typeof zh, string>;
+/** Spanish dictionary (keys mirror zh). */
+export declare const es: Record<keyof typeof zh, string>;
+/** Combined dictionary map covering all 9 languages. */
+export declare const dictionaries: Record<string, Record<string, string>>;
 /** Dictionary key union. */
 export type SteerKey = keyof typeof zh;
 //# sourceMappingURL=locales.d.ts.map
