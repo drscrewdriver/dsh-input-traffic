@@ -46,7 +46,13 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis';
  * land below us.
  */
 export declare const QUEUE_DOCK_ORDER = 1000;
-/** Services required by the browser half. */
+/**
+ * Services required by the browser half. Only the six-line-universal faces
+ * live here — the durable-settings face (`configForms` on 0.1.7+,
+ * `settingsScope` on ≤0.1.5) is resolved by scoped sub-injects inside the
+ * compat waist, because a plugin-level inject of a per-line service would
+ * leave the WHOLE fiber PENDING on the other line (silent total deactivation).
+ */
 export declare const inject: string[];
 /**
  * Client plugin body: dictionaries, busy-Enter pinning, and the two slot

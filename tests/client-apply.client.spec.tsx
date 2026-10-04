@@ -8,6 +8,10 @@
  * winners by `order`), while `priority` only picks the winner of a shared cell
  * id. Regression guard for dsh-perm-gate's notice strip (order 30) landing
  * between the queue strip and the composer card.
+ *
+ * The settings-face tests cover the compat waist's three postures: modern
+ * hosts (`configForms`), pre-0.1.7 hosts (`settingsScope`), and hosts with
+ * neither (the plugin must stay inert on that face, never throw).
  */
 import { describe, expect, it } from 'vitest'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
@@ -21,12 +25,39 @@ interface Registration {
   priority?: number
 }
 
+/** Which durable-settings service the fake host carries. */
+type SettingsLine = 'configForms' | 'settingsScope' | 'none'
+
+/** One recorded busy-Enter pin. */
+interface PinRecord { via: SettingsLine; namespace: string; field: string; value: unknown }
+
 /**
- * Build a client root context that records every `slots.register` call.
- * @returns the context (cast to the declared client shape) plus the ledger.
+ * Build a client root context that records every `slots.register` call and
+ * every settings pin. `inject(services, cb)` mimics cordis: the callback runs
+ * synchronously with the resolved services when all of them exist, and the
+ * fiber merely pends (callback never runs) when one is missing.
  */
-function makeCtx(): { ctx: ClientContext; registrations: Registration[] } {
+function makeCtx(settings: SettingsLine = 'configForms'): {
+  ctx: ClientContext
+  registrations: Registration[]
+  pins: PinRecord[]
+} {
   const registrations: Registration[] = []
+  const pins: PinRecord[] = []
+  const recordPin = (via: SettingsLine) => (specOrNs: { namespace: string } | string) => {
+    const namespace = typeof specOrNs === 'string' ? specOrNs : specOrNs.namespace
+    return {
+      set: async (field: string, value: unknown): Promise<boolean> => {
+        pins.push({ via, namespace, field, value })
+        return true
+      },
+      getSnapshot: () => ({ status: 'ready', value: { busyEnter: 'queue' }, writable: true }),
+      subscribe: () => () => {},
+    }
+  }
+  const services: Record<string, unknown> = {}
+  if (settings === 'configForms') services.configForms = { get: recordPin('configForms') }
+  if (settings === 'settingsScope') services.settingsScope = { bind: recordPin('settingsScope') }
   const ctx = {
     effect: (fn: () => unknown): (() => void) => {
       const cleanup = fn()
@@ -34,8 +65,11 @@ function makeCtx(): { ctx: ClientContext; registrations: Registration[] } {
     },
     on: () => () => {},
     get: () => undefined,
+    inject: (names: string[], cb: (...resolved: unknown[]) => void): (() => void) => {
+      if (names.every((n) => services[n] !== undefined)) cb(...names.map((n) => services[n]))
+      return () => {}
+    },
     locale: { register: () => {}, bind: () => (key: string) => key },
-    configForms: { get: () => ({ set: async () => true }) },
     slots: {
       inject: (_name: string, fn: () => unknown) => {
         fn()
@@ -48,14 +82,14 @@ function makeCtx(): { ctx: ClientContext; registrations: Registration[] } {
     },
     sessions: { scope: () => undefined },
   }
-  return { ctx: ctx as unknown as ClientContext, registrations }
+  return { ctx: ctx as unknown as ClientContext, registrations, pins }
 }
 
 describe('client apply()', () => {
-  it('registers the takeover slots plus the family settings tab', () => {
+  it('registers the takeover slots plus the family settings tab (modern host)', () => {
     const { ctx, registrations } = makeCtx()
     apply(ctx)
-    expect(registrations.map(r => r.name)).toEqual([
+    expect([...registrations.map(r => r.name)].sort()).toEqual([
       'conversation.input.dock',
       'conversation.input.right',
       'dsh-family.tab',
@@ -95,5 +129,34 @@ describe('client apply()', () => {
     const row = registrations.find(r => r.name === 'settings.general.item')
     expect(row?.id).toBe('composer-enter')
     expect(row?.priority).toBe(-1)
+  })
+
+  it('pins busyEnter through configForms on modern hosts and never touches settingsScope', () => {
+    const { ctx, pins } = makeCtx('configForms')
+    apply(ctx)
+    expect(pins).toEqual([
+      { via: 'configForms', namespace: 'ui-conversation', field: 'busyEnter', value: 'queue' },
+    ])
+  })
+
+  it('pins busyEnter through settingsScope on pre-0.1.7 hosts', () => {
+    const { ctx, pins, registrations } = makeCtx('settingsScope')
+    apply(ctx)
+    expect(pins).toEqual([
+      { via: 'settingsScope', namespace: 'ui-conversation', field: 'busyEnter', value: 'queue' },
+    ])
+    // The family tab still registers — against the bind() scope.
+    expect(registrations.map(r => r.name)).toContain('dsh-family.tab')
+  })
+
+  it('stays inert on the settings face (no throw, three slots remain) when neither service exists', () => {
+    const { ctx, pins, registrations } = makeCtx('none')
+    expect(() => apply(ctx)).not.toThrow()
+    expect(pins).toEqual([])
+    expect(registrations.map(r => r.name)).toEqual([
+      'conversation.input.dock',
+      'conversation.input.right',
+      'settings.general.item',
+    ])
   })
 })

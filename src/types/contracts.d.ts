@@ -7,14 +7,20 @@
  * the real modules at runtime.
  *
  * These declarations mirror the harness sources at the anchors below for the
- * supported release segment `>=0.1.5-alpha.1 <0.2.0-0` — the DSH line with the
- * Session V3 surface nodes and the dockkit sidebar. Anchors were verified
- * against dsh-v0.1.5-rc.2 (2026-09-11). Every type the `dsh-client-runtime`
- * deletion orphaned is re-homed to the package that owns it today, so the
- * plugin consumes the same public API the harness itself consumes. Members
- * are declared only where this plugin reads them, so a regression that reaches
- * for a surface the segment does not carry fails `tsc` instead of failing in a
- * user's browser.
+ * enumerated six host lines 0.1.0 / 0.1.1 / 0.1.2 / 0.1.5 / 0.1.7 / 0.2.0
+ * (scripts/hosts.mjs is the version source of truth). Anchors were verified
+ * against dsh-v0.1.5-rc.2 (2026-09-11); the 0.1.7 → 0.2.0-rc.1 range diff
+ * (261 commits) leaves the mirrored surfaces — session / session-controller
+ * contracts — untouched, and `tsc` for the dev line runs against the real
+ * 0.2.0-rc.2 client packages (scripts/hosts.mjs `developmentHost`). The
+ * ≤0.1.5 `settingsScope` face is NOT declared here — its structural type
+ * lives in `src/client/compat.ts` (the version-sensitivity waist), keeping
+ * this file free of per-line ambient merges. Every type the
+ * `dsh-client-runtime` deletion orphaned is re-homed to the package that owns
+ * it today, so the plugin consumes the same public API the harness itself
+ * consumes. Members are declared only where this plugin reads them, so a
+ * regression that reaches for a surface the segment does not carry fails
+ * `tsc` instead of failing in a user's browser.
  *
  * Mirror anchors (verified 2026-09-11 against dsh-v0.1.5-rc.2):
  * - `packages/core/session/src/types.ts:19` — `SessionId`.
@@ -150,34 +156,6 @@ declare module '@deepseek-ai/dsh-client-locale/client' {
   /** Dictionary registration and bound-translate face. */
   export interface LocaleFace {
     register(namespace: string, dictionaries: Record<string, Record<string, string>>): () => void
-  }
-}
-
-declare module '@deepseek-ai/dsh-client-ui-settings/client' {
-  /** Snapshot of one durable namespace scope, as the settings card reads it. */
-  export interface SettingsScopeSnapshot<T> {
-    status: 'loading' | 'ready' | 'unavailable'
-    value: T | undefined
-    /** Composition base layer and raw user layer, exposed for override display. */
-    base: unknown
-    user: unknown
-    /** Write fence: the revision this snapshot was folded at. */
-    revision: number | undefined
-    writable: boolean
-    mode: 'host' | 'memory'
-  }
-
-  /** Durable namespace scope owner used to pin the busy-Enter field. */
-  export interface SettingsScope<T> {
-    getSnapshot(): SettingsScopeSnapshot<T>
-    subscribe(listener: () => void): () => void
-    set(field: string, value: unknown): Promise<void>
-    unset(field: string): Promise<void>
-  }
-
-  /** Context merge providing namespace binding. */
-  export interface SettingsScopeFace {
-    bind<T>(spec: { namespace: string; decode?: (section: unknown) => T | undefined }): SettingsScope<T>
   }
 }
 

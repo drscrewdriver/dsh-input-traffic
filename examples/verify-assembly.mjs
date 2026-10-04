@@ -80,8 +80,13 @@ try {
   check('factory exports apply + inject', typeof exports_?.apply === 'function'
     && Array.isArray(exports_?.inject) && exports_?.inject.includes('slots'),
     exports_?.inject?.join(', '))
+  // The plugin-level inject lists only the six-line-universal services: the
+  // per-line durable-settings face (configForms 0.1.7+ / settingsScope ≤0.1.5)
+  // is resolved by scoped sub-injects in the compat waist, so it must NOT be
+  // here (a plugin-level wait on a missing service would pend the whole fiber).
   check('inject declares conversation services', exports_?.inject?.includes('conversation')
-    && exports_?.inject?.includes('sessions') && exports_?.inject?.includes('configForms'),
+    && exports_?.inject?.includes('sessions') && !exports_?.inject?.includes('configForms')
+    && !exports_?.inject?.includes('settingsScope'),
     exports_?.inject?.join(', '))
   void bundled
 

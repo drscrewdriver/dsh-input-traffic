@@ -43,6 +43,7 @@ import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import { FreezeButton } from './freeze-button.tsx'
 import { InputTrafficFamilyCard } from './family-card.tsx'
 import { HideEnterRow } from './hide-enter-row.tsx'
+import { draftWriter, registerSettingsFaces } from './compat.ts'
 
 /** Durable conversation settings namespace owned by ui-conversation. */
 const CONVERSATION_SETTINGS_NAMESPACE = 'ui-conversation'
@@ -80,8 +81,14 @@ function steerPrompt(actx: ClientContext, text: string): Promise<void> {
   return conversation.send(text)
 }
 
-/** Services required by the browser half. */
-export const inject = ['slots', 'locale', 'sessions', 'conversation', 'configForms']
+/**
+ * Services required by the browser half. Only the six-line-universal faces
+ * live here — the durable-settings face (`configForms` on 0.1.7+,
+ * `settingsScope` on ≤0.1.5) is resolved by scoped sub-injects inside the
+ * compat waist, because a plugin-level inject of a per-line service would
+ * leave the WHOLE fiber PENDING on the other line (silent total deactivation).
+ */
+export const inject = ['slots', 'locale', 'sessions', 'conversation']
 
 /**
  * Client plugin body: dictionaries, busy-Enter pinning, and the two slot
@@ -101,12 +108,27 @@ export function apply(ctx: ClientContext): void {
   // the official row is hidden. Pinning here also repairs a persisted `steer`
   // preference that would otherwise keep working invisibly behind the hidden
   // row. Best-effort: a memory-mode host simply accepts it locally.
-  // 0.1.7: cross-entry config writes go through configForms; the conversation
-  // entry id happens to equal the old settings namespace (`ui-conversation`).
-  const conversationSettings = ctx.configForms.get<{ busyEnter: 'queue' | 'steer' }>(
-    CONVERSATION_SETTINGS_NAMESPACE,
-  )
-  void conversationSettings.set(BUSY_ENTER_FIELD, 'queue')
+  // The durable-settings service is per-line (configForms 0.1.7+ /
+  // settingsScope ≤0.1.5) — the compat waist resolves it and the family tab
+  // registers against whichever scope resolves.
+  registerSettingsFaces(ctx, {
+    namespace: CONVERSATION_SETTINGS_NAMESPACE,
+    field: BUSY_ENTER_FIELD,
+    value: 'queue',
+    onScope: (scope) => {
+      // 插件族共用设置 tab：只读状态卡（busyEnter 钉死展示 + 使用说明）。
+      // 持有者是跨插件族（thinking-levels 一族，非宿主本体），缺席时 slot
+      // inject 静默等待，不阻塞客户端半。
+      ctx.slots.inject('dsh-family.tab', () => ctx.slots.register({
+        name: 'dsh-family.tab',
+        id: 'input-traffic',
+        order: 50,
+        label: () => tFamily('family.title'),
+        locale: NS,
+        inject: () => ({ scope }),
+      }, InputTrafficFamilyCard))
+    },
+  })
 
   // Shadow the official queue dock with the three-tier planning strip. The
   // high `order` keeps it the bottom-most entry of the band (see the file
@@ -126,7 +148,7 @@ export function apply(ctx: ClientContext): void {
         updateQueue: (itemId, action) => conversation.updateQueue(itemId as never, action),
         cancel: () => conversation.cancel(),
         send: (text) => conversation.send(text),
-        setDraft: (text) => { conversation.input.for(actx).setDraft(text) },
+        setDraft: draftWriter(conversation, actx),
         notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
       }
     },
@@ -150,7 +172,7 @@ export function apply(ctx: ClientContext): void {
         // safe_point 恢复经 conversation.send 排队到下一轮（本版契约无 steer prompt 面）。
         sendSteer: (text) => steerPrompt(actx, text),
         sessionId: String(sessionId),
-        setDraft: (text) => { conversation.input.for(actx).setDraft(text) },
+        setDraft: draftWriter(conversation, actx),
         notify: (level, text) => { conversation.input.for(actx).notify(level, text) },
         // 冻结期间 raise composer block：composer 变 inert（回车/发送按钮全部失效），
         // 输入不会漏进对话；恢复时清除。block 不锁 input.right（恢复按钮仍可点）。
@@ -160,17 +182,6 @@ export function apply(ctx: ClientContext): void {
       }
     },
   }, FreezeButton))
-
-  // 插件族共用设置 tab：只读状态卡（busyEnter 钉死展示 + 使用说明）。
-  // thinking-levels 缺席时 inject 静默等待，不阻塞客户端半。
-  ctx.slots.inject('dsh-family.tab', () => ctx.slots.register({
-    name: 'dsh-family.tab',
-    id: 'input-traffic',
-    order: 50,
-    label: () => tFamily('family.title'),
-    locale: NS,
-    inject: () => ({ scope: conversationSettings }),
-  }, InputTrafficFamilyCard))
 
   // Hide the official busy-Enter settings row (null render wins the cell).
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
