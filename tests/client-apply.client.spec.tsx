@@ -66,7 +66,10 @@ function makeCtx(settings: SettingsLine = 'configForms'): {
     on: () => () => {},
     get: () => undefined,
     inject: (names: string[], cb: (...resolved: unknown[]) => void): (() => void) => {
-      if (names.every((n) => services[n] !== undefined)) cb(...names.map((n) => services[n]))
+      // cordis 真实形态：回调收到 scope 对象（服务按名取），不是裸服务。
+      if (names.every((n) => services[n] !== undefined)) {
+        cb(Object.fromEntries(names.map((n) => [n, services[n]])))
+      }
       return () => {}
     },
     locale: { register: () => {}, bind: () => (key: string) => key },

@@ -52,19 +52,29 @@ export interface SettingsFacesDeps {
  * as the family tab's slot-inject when the family holder is absent).
  */
 export function registerSettingsFaces(ctx: ClientContext, deps: SettingsFacesDeps): void {
+  // cordis inject 回调收到的是 (ctx, config)——服务要按名从 scope 对象上读
+  // （thinking-levels 腰的同款形态；0.7.1 曾把参数当裸服务 .get/.bind 调用，
+  // 每一代宿主上都是 TypeError，纤维暗死 → onScope 永不回调 → 卡永远降级）。
+  const scopeInject = (ctx as unknown as {
+    inject: (deps: string[], cb: (scope: Record<string, unknown>) => void) => void
+  }).inject
   // Modern hosts (0.1.7+): configForms owns cross-entry durable writes.
-  ctx.inject(['configForms'], (configForms: unknown) => {
-    const scope = (configForms as { get(namespace: string): SettingsDocHandle }).get(deps.namespace)
-    void scope.set(deps.field, deps.value)
-    deps.onScope(scope)
+  scopeInject(['configForms'], (scope) => {
+    const forms = scope.configForms as { get(namespace: string): SettingsDocHandle } | undefined
+    if (forms === undefined) return
+    const handle = forms.get(deps.namespace)
+    void handle.set(deps.field, deps.value)
+    deps.onScope(handle)
   })
   // Old hosts (≤0.1.5): namespaced durable scope via bind().
-  ctx.inject(['settingsScope'], (settingsScope: unknown) => {
-    const scope = (settingsScope as {
-      bind(spec: { namespace: string }): SettingsDocHandle
-    }).bind({ namespace: deps.namespace })
-    void scope.set(deps.field, deps.value)
-    deps.onScope(scope)
+  scopeInject(['settingsScope'], (scope) => {
+    const settingsScope = scope.settingsScope as
+      | { bind(spec: { namespace: string }): SettingsDocHandle }
+      | undefined
+    if (settingsScope === undefined) return
+    const handle = settingsScope.bind({ namespace: deps.namespace })
+    void handle.set(deps.field, deps.value)
+    deps.onScope(handle)
   })
 }
 
