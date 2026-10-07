@@ -18,7 +18,8 @@ export interface FamilyCardScope {
 }
 
 export interface FamilyCardProps {
-  scope: FamilyCardScope
+  /** 活引用：≤0.1.5 settingsScope 永不 resolve 时保持 undefined（降级渲染）。 */
+  scope?: FamilyCardScope
   t?: (key: string, params?: Record<string, unknown>) => string
 }
 
@@ -27,6 +28,14 @@ const label: CSSProperties = { color: 'var(--dsw-alias-label-primary, inherit)' 
 const dim: CSSProperties = { color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,.8))', fontSize: 12, lineHeight: 1.5 }
 
 export function InputTrafficFamilyCard({ scope, t }: FamilyCardProps): JSX.Element {
+  // scope 活引用未解析（≤0.1.5 settingsScope 死路）时的降级态：卡仍在账本里
+  // （导航/接管节可见），数据缺席呈现不可用说明而不是崩/空白。
+  if (!scope) {
+    const tr = (key: string): string => (t ? t(key) : FALLBACK_ZH[key] ?? key)
+    return createElement('div', { style: { display: 'grid', gap: 6 } },
+      createElement('p', { style: { ...dim, margin: 0 } }, `${tr('family.desc')}（当前宿主设置服务不可用 — 只读）`),
+    )
+  }
   const snapshot = useSyncExternalStore(
     (listener) => scope.subscribe(listener),
     () => scope.getSnapshot(),

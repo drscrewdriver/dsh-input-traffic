@@ -22,7 +22,8 @@ export interface FamilyCardScope {
     subscribe(listener: () => void): () => void;
 }
 export interface FamilyCardProps {
-    scope: FamilyCardScope;
+    /** 活引用：≤0.1.5 settingsScope 永不 resolve 时保持 undefined（降级渲染）。 */
+    scope?: FamilyCardScope;
     t?: (key: string, params?: Record<string, unknown>) => string;
 }
 export declare function InputTrafficFamilyCard({ scope, t }: FamilyCardProps): JSX.Element;

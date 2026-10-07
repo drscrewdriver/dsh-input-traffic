@@ -43,7 +43,7 @@ import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import { FreezeButton } from './freeze-button.tsx'
 import { InputTrafficFamilyCard } from './family-card.tsx'
 import { HideEnterRow } from './hide-enter-row.tsx'
-import { draftWriter, registerSettingsFaces } from './compat.ts'
+import { draftWriter, registerSettingsFaces, type SettingsDocHandle } from './compat.ts'
 
 /** Durable conversation settings namespace owned by ui-conversation. */
 const CONVERSATION_SETTINGS_NAMESPACE = 'ui-conversation'
@@ -111,22 +111,26 @@ export function apply(ctx: ClientContext): void {
   // The durable-settings service is per-line (configForms 0.1.7+ /
   // settingsScope ≤0.1.5) — the compat waist resolves it and the family tab
   // registers against whichever scope resolves.
+  // 2026-10-07 修复（0.1.5 家族节空白根因，perm-gate ea18a6a 同款）：≤0.1.5 上
+  // settingsScope 子注入永不 resolve → onScope 永不回调 → 原先关在回调里的
+  // family.tab 注册从未执行 → 接管/托管节账本为空 → 节内容空白。注册是金贵的：
+  // 提到 apply 顶层无条件执行，scope 改活引用（回调解到就填，卡 inject 现读），
+  // 未解析时卡自身呈现不可用态而不是整卡缺席。
+  const familyScopeRef: { scope?: SettingsDocHandle } = {}
+  ctx.slots.inject('dsh-family.tab', () => ctx.slots.register({
+    name: 'dsh-family.tab',
+    id: 'input-traffic',
+    order: 50,
+    label: () => tFamily('family.title'),
+    locale: NS,
+    inject: () => ({ scope: familyScopeRef.scope }),
+  }, InputTrafficFamilyCard))
   registerSettingsFaces(ctx, {
     namespace: CONVERSATION_SETTINGS_NAMESPACE,
     field: BUSY_ENTER_FIELD,
     value: 'queue',
     onScope: (scope) => {
-      // 插件族共用设置 tab：只读状态卡（busyEnter 钉死展示 + 使用说明）。
-      // 持有者是跨插件族（thinking-levels 一族，非宿主本体），缺席时 slot
-      // inject 静默等待，不阻塞客户端半。
-      ctx.slots.inject('dsh-family.tab', () => ctx.slots.register({
-        name: 'dsh-family.tab',
-        id: 'input-traffic',
-        order: 50,
-        label: () => tFamily('family.title'),
-        locale: NS,
-        inject: () => ({ scope }),
-      }, InputTrafficFamilyCard))
+      familyScopeRef.scope = scope
     },
   })
 
