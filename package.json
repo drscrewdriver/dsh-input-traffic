@@ -2,6 +2,7 @@
   "name": "dsh-input-traffic",
   "version": "0.7.3",
   "publishConfig": {
+    "registry": "https://registry.npmjs.org",
     "tag": "latest"
   },
   "type": "module",
