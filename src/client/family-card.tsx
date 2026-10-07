@@ -27,21 +27,26 @@ const row: CSSProperties = { display: 'flex', alignItems: 'center', justifyConte
 const label: CSSProperties = { color: 'var(--dsw-alias-label-primary, inherit)' }
 const dim: CSSProperties = { color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,.8))', fontSize: 12, lineHeight: 1.5 }
 
+/** 无 scope 时的降级快照（模块级常量：useSyncExternalStore 要求稳定引用）。 */
+const DEGRADED_SNAPSHOT = { status: 'unavailable', value: undefined, writable: false }
+
 export function InputTrafficFamilyCard({ scope, t }: FamilyCardProps): JSX.Element {
-  // scope 活引用未解析（≤0.1.5 settingsScope 死路）时的降级态：卡仍在账本里
+  // hooks 无条件调用（rules-of-hooks）：无 scope 时订阅为 no-op、快照取模块级
+  // 降级常量；scope 缺席与否在挂载期内是稳定的（双轨后 scope 恒有，本分支只
+  // 是防御位），不会触发 hook 序翻转。
+  const snapshot = useSyncExternalStore(
+    (listener) => scope?.subscribe(listener) ?? (() => {}),
+    () => scope?.getSnapshot() ?? DEGRADED_SNAPSHOT,
+  )
+  const tr = (key: string): string => (t ? t(key) : FALLBACK_ZH[key] ?? key)
+  // scope 缺席（防御位，双轨后常态不可达）的降级态：卡仍在账本里
   // （导航/接管节可见），数据缺席呈现不可用说明而不是崩/空白。
   if (!scope) {
-    const tr = (key: string): string => (t ? t(key) : FALLBACK_ZH[key] ?? key)
     return createElement('div', { style: { display: 'grid', gap: 6 } },
       createElement('p', { style: { ...dim, margin: 0 } }, `${tr('family.desc')}（当前宿主设置服务不可用 — 只读）`),
     )
   }
-  const snapshot = useSyncExternalStore(
-    (listener) => scope.subscribe(listener),
-    () => scope.getSnapshot(),
-  )
   const pinned = snapshot.value?.busyEnter ?? 'queue'
-  const tr = (key: string): string => (t ? t(key) : FALLBACK_ZH[key] ?? key)
   return createElement('div', { style: { display: 'grid', gap: 6 } },
     createElement('div', { style: row },
       createElement('span', { style: label }, tr('family.busyEnter')),

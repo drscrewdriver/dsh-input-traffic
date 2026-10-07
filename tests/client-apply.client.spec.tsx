@@ -152,19 +152,22 @@ describe('client apply()', () => {
     expect(registrations.map(r => r.name)).toContain('dsh-family.tab')
   })
 
-  it('family tab registers unconditionally (degraded, no scope) when neither service exists', () => {
+  it('family tab registers unconditionally; scope falls back to the bridge when neither service exists', () => {
     // 2026-10-07 修复后契约：family.tab 是跨插件槽位（thinking-levels/接管节
     // 的 dsh-family.tab 账本），注册不依赖本仓的 settings 面——≤0.1.5 上
     // settingsScope 永不 resolve 曾把注册关进 onScope 回调导致家族节整节空白。
-    // 现注册无条件执行，scope 缺席由卡片自身降级（只读说明态）。
+    // 2026-10-08 T20-b 增补：两服务皆缺的线上 scope 不再是 undefined 而是落到
+    // 自家 webServer 桥（BridgeDocHandle），钉值改由桥在首拉 ready 后补发——
+    // 本桩环境 fetch 不通 → 桥停在 error 态，原生钉计数仍为空、桥钉不触发。
     const { ctx, pins, registrations } = makeCtx('none')
     expect(() => apply(ctx)).not.toThrow()
     expect(pins).toEqual([])
-    const family: any = registrations.find(r => r.name === 'dsh-family.tab')
+    const family = registrations.find(r => r.name === 'dsh-family.tab') as
+      (Registration & { inject?: () => Record<string, unknown> }) | undefined
     expect(family).toBeDefined()
-    // inject 现读活引用：scope 未解析时传 undefined（卡降级渲染）。
+    // inject 现读活引用：原生缺席时传桥句柄（pending/error 态由卡自身呈现）。
     const face = (family!['inject'] as () => Record<string, unknown>)()
-    expect(face['scope']).toBeUndefined()
+    expect(face['scope']).toBeDefined()
     expect(registrations.map(r => r.name)).toEqual([
       'dsh-family.tab',
       'conversation.input.dock',

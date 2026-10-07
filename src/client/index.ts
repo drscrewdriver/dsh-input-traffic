@@ -43,6 +43,7 @@ import type { SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import { FreezeButton } from './freeze-button.tsx'
 import { InputTrafficFamilyCard } from './family-card.tsx'
 import { HideEnterRow } from './hide-enter-row.tsx'
+import { BridgeDocHandle } from './bridge-scope.ts'
 import { draftWriter, registerSettingsFaces, type SettingsDocHandle } from './compat.ts'
 
 /** Durable conversation settings namespace owned by ui-conversation. */
@@ -117,13 +118,34 @@ export function apply(ctx: ClientContext): void {
   // 提到 apply 顶层无条件执行，scope 改活引用（回调解到就填，卡 inject 现读），
   // 未解析时卡自身呈现不可用态而不是整卡缺席。
   const familyScopeRef: { scope?: SettingsDocHandle } = {}
+  // T20-b 桥轨（perm-gate T13b 双轨同架构）：≤0.1.5 上 settingsScope 子注入
+  // 永不 resolve（A2 死路），原生句柄缺席时卡片数据与 busyEnter 钉值走自家
+  // webServer 桥（node 半区挂 describe/mutate 路由对；0.1.0 宿主 settings
+  // 服务实测全款具备该面）。原生句柄优先——configForms 臂解到就改走原生，
+  // 桥只在原生缺席时供数；桥 pending 期间快照 value 为 undefined，卡按钉死
+  // 默认值渲染，首拉落地后订阅通知刷新。
+  const bridgeScope = new BridgeDocHandle(CONVERSATION_SETTINGS_NAMESPACE)
+  let nativeScopeResolved = false
+  let bridgePinned = false
+  bridgeScope.subscribe(() => {
+    if (bridgePinned || nativeScopeResolved) return
+    if (bridgeScope.getSnapshot().status !== 'ready') return
+    // Pin through the bridge once, only when the native arm never resolved
+    // (≤0.1.5): same semantics as the configForms arm's startup pin. Worst
+    // race (both arms ready simultaneously) writes the same value twice —
+    // idempotent, and the host serializes writers.
+    bridgePinned = true
+    void bridgeScope.set(BUSY_ENTER_FIELD, 'queue').catch((e: unknown) => {
+      console.warn('[dsh-input-traffic] bridge busyEnter pin failed:', e)
+    })
+  })
   ctx.slots.inject('dsh-family.tab', () => ctx.slots.register({
     name: 'dsh-family.tab',
     id: 'input-traffic',
     order: 50,
     label: () => tFamily('family.title'),
     locale: NS,
-    inject: () => ({ scope: familyScopeRef.scope }),
+    inject: () => ({ scope: familyScopeRef.scope ?? bridgeScope }),
   }, InputTrafficFamilyCard))
   registerSettingsFaces(ctx, {
     namespace: CONVERSATION_SETTINGS_NAMESPACE,
@@ -131,6 +153,7 @@ export function apply(ctx: ClientContext): void {
     value: 'queue',
     onScope: (scope) => {
       familyScopeRef.scope = scope
+      nativeScopeResolved = true
     },
   })
 
