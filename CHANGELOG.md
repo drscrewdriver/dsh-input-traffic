@@ -2,6 +2,27 @@
 
 所有重要变更与 bug 修复记录于此。版本遵循语义化版本（`dsh plugin --profile web add dsh-input-traffic` 安装）。
 
+## 0.7.3 — 2026-10-08
+
+### 新增：settings 数据桥（T20-b，perm-gate 5260fe6 泛化形移植）
+
+- 老线（≤0.1.5）上 client settings 句柄永不 resolve（settingsScope 死路），家族卡
+  降级「设置服务不可用」、busyEnter 钉值静默失效。node 半区从 no-op 转正：loader
+  `inject=['webServer']` + `settings` 子注入挂活引用，暴露
+  `/api/ui-conversation/settings/{describe,mutate}`；client 半区 BridgeDocHandle
+  双轨（原生句柄优先、桥兜底），钉值在原生缺席时由桥首拉 ready 后补发一次。
+  前提实证：0.1.0 宿主 settings 服务全款具备 describe/mutate/redactSecrets 面，
+  最老线无需兜底。五格验收：四条桥线卡片真数据、0.1.7 原生无回归、桥写回落盘。
+- 顺修 family-card 条件 hook（useSyncExternalStore 无条件调用；降级快照走模块级
+  常量）。
+
+### 0.7.1 / 0.7.2 未单独发版（tgz 直铺五格），随本版一并进 npm
+
+- 0.7.0：15rc 枚举单版本线（六 peer × 15 rc 全存在），latest + 四线 tag 收敛（已发）。
+- 0.7.1：`dsh-family.tab` 注册提顶层 + scopeRef 活引用（≤0.1.5 家族节贡献卡缺席修复）。
+- 0.7.2：settings waist 回调按 cordis 契约从 scope 对象按名读服务（裸服务调用 =
+  每代 TypeError、纤维暗死，busyEnter 钉值因此从未生效）。
+
 ## 0.5.5 — 2026-09-30
 
 ### 修复：队列行改读 inbox 投影（真实宿主渲染修复，实测 0.1.7-rc.2）
