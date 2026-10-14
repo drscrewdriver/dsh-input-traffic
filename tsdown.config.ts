@@ -13,7 +13,7 @@
  * fails the purity gate below.
  */
 import { readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, resolve as resolvePath, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { UserConfig } from 'tsdown'
@@ -109,8 +109,8 @@ const clientConfig: UserConfig = {
     name: 'dsh-css-modules-inline',
     resolveId(source: string, importer: string | undefined) {
       if (!source.endsWith('.module.css')) return null
-      const abs = importer !== undefined ? sourceAssetPath(source, importer) : source
-      return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+      const raw = importer !== undefined ? sourceAssetPath(source, importer) : source
+      return CSS_VIRTUAL_PREFIX + canonicalPath(raw) + CSS_VIRTUAL_SUFFIX
     },
     async load(virtualId: string) {
       if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
@@ -124,7 +124,14 @@ const clientConfig: UserConfig = {
         minify: true,
       })
       const classMap: Record<string, string> = {}
-      for (const [local, exp] of Object.entries(cssExports ?? {})) classMap[local] = exp.name
+      // lightningcss hands `exports` back from a Rust hash map whose iteration
+      // order is re-seeded per process, so an unsorted emit shuffles these keys
+      // on every build — same sources, different bytes. Sorting keeps the bundle
+      // byte-stable, which is what lets the package gate compare artifacts at
+      // all (dsh-tidy-display's tools/client-build.js does the same).
+      const byLocal = (a: [string, { name: string }], b: [string, { name: string }]): number =>
+        a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0
+      for (const [local, exp] of Object.entries(cssExports ?? {}).sort(byLocal)) classMap[local] = exp.name
       return [
         `const css = ${JSON.stringify(code.toString())};`,
         `const tagId = ${JSON.stringify(`${PLUGIN_ID}/${basename(fileId)}`)};`,
@@ -156,6 +163,27 @@ function sourceAssetPath(source: string, importer: string): string {
   const boundary = emitted.indexOf(marker)
   if (boundary < 0) return emitted
   return resolvePath(emitted.slice(0, boundary), 'src', emitted.slice(boundary + marker.length))
+}
+
+/**
+ * Pin a path to its on-disk spelling.
+ *
+ * Windows hands back the drive letter in whatever case the build was invoked
+ * with (`E:\…` vs `e:\…`), and lightningcss derives the `[hash]` of every
+ * CSS-module class from the filename it is given — so starting the build from a
+ * differently-cased cwd renamed every generated class while changing nothing
+ * else. The virtual module id lands in the bundle's `//#region` comments too,
+ * so this keeps the artifact byte-identical across invocations, which is the
+ * only reason a committed `lib/` can be diffed at all.
+ */
+function canonicalPath(absolute: string): string {
+  try {
+    return realpathSync.native(absolute)
+  } catch {
+    // Unreadable path: the caller's own readFile will surface the real error,
+    // and a hash derived from the unresolved spelling is still self-consistent.
+    return absolute
+  }
 }
 
 export default [nodeConfig, clientConfig]

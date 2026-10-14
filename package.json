@@ -56,6 +56,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && tsdown",
+    "prepack": "npm run build",
     "test": "vitest run",
     "clean": "node -e \"require('node:fs').rmSync('lib', { recursive: true, force: true })\"",
     "lint": "eslint src tests",
