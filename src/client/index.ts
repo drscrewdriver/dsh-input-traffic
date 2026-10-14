@@ -45,6 +45,7 @@ import { InputTrafficFamilyCard } from './family-card.tsx'
 import { HideEnterRow } from './hide-enter-row.tsx'
 import { BridgeDocHandle } from './bridge-scope.ts'
 import { draftWriter, registerSettingsFaces, type SettingsDocHandle } from './compat.ts'
+import { claimFamilyHostIfOrphaned, type FamilyHostSlots } from './family-host.ts'
 
 /** Durable conversation settings namespace owned by ui-conversation. */
 const CONVERSATION_SETTINGS_NAMESPACE = 'ui-conversation'
@@ -139,14 +140,31 @@ export function apply(ctx: ClientContext): void {
       console.warn('[dsh-input-traffic] bridge busyEnter pin failed:', e)
     })
   })
-  ctx.slots.inject('dsh-family.tab', () => ctx.slots.register({
-    name: 'dsh-family.tab',
-    id: 'input-traffic',
-    order: 50,
-    label: () => tFamily('family.title'),
-    locale: NS,
-    inject: () => ({ scope: familyScopeRef.scope ?? bridgeScope }),
-  }, InputTrafficFamilyCard))
+  // 探针：宿主执行过本工厂 == 有人声明了 `dsh-family.tab`（插件侧唯一合法的
+  // 「容器在不在」判据，槽门面不暴露 spec 查询）。
+  let familyTabHeld = false
+  ctx.slots.inject('dsh-family.tab', () => {
+    familyTabHeld = true
+    return ctx.slots.register({
+      name: 'dsh-family.tab',
+      id: 'input-traffic',
+      order: 50,
+      label: () => tFamily('family.title'),
+      locale: NS,
+      inject: () => ({ scope: familyScopeRef.scope ?? bridgeScope }),
+    }, InputTrafficFamilyCard)
+  })
+  // 家族容器兜底：到分级时刻仍无人声明子席位（owner 全部让位/声明失败）则自己上位，
+  // 否则本卡整轮启动不可见且不报错。declare-or-withdraw：声明失败不裸注册。
+  ctx.effect(
+    () => claimFamilyHostIfOrphaned(
+      ctx.slots as unknown as FamilyHostSlots,
+      () => familyTabHeld,
+      () => '起子插件设置',
+      '[dsh-input-traffic]',
+    ),
+    'dsh-input-traffic: family host backstop',
+  )
   registerSettingsFaces(ctx, {
     namespace: CONVERSATION_SETTINGS_NAMESPACE,
     field: BUSY_ENTER_FIELD,
