@@ -41,7 +41,7 @@ const FAMILY_CHILD_KEY = 'dsh-family.tab'
  * 接管分级——唯一真源是 `mine-dsh-plugins/_tools/family-rank.mjs`（离线实测 GitHub
  * star + npm 周下载量加权）。延迟 = BASE + RANK * STEP；rank 越大越靠后兜底。
  */
-export const FAMILY_CLAIM_RANK = 2
+export const FAMILY_CLAIM_RANK = 1
 const FAMILY_CLAIM_BASE_MS = 200
 const FAMILY_CLAIM_STEP_MS = 900
 /** 派生而非硬编码：改 rank 表就自动改时刻。 */
