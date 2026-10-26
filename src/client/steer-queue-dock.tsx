@@ -11,11 +11,14 @@
  *   later (the yellow flow is reversible);
  * - yellow (next): strict-steer the row into the running turn, consumed at
  *   the next step boundary (after the current action finishes);
- * - red (now): cancel the running turn, then remove the row and re-send its
- *   text as a fresh message —the re-send arms the harness wake latch (the
- *   converged driver restarts) and the interrupted input is processed as the
- *   next turn's input. A plain steer after cancel would re-insert a message
- *   that is already pending in next-turn and the inbox rejects it.
+ * - red (now): interrupt the running turn and make that single row the next
+ *   input. Every other pending row leaves the queue first and comes back
+ *   afterwards in its original order as a plain queued (green) row — the
+ *   re-sent target is then the only pending row, hence the one the woken
+ *   driver claims. A cancelled turn has no next step left for a yellow row to
+ *   steer into, so falling back to green is the correct outcome. Every touched
+ *   row must be pure text: the re-send path only carries text (a durable file
+ *   reference has no way back into `prompt`).
  *
  * The toolbar also exposes a queue-level "cancel and clear" that stops the
  * current run and removes every queued row, plus a session-level
@@ -66,8 +69,13 @@ export type SteerQueueAction =
 /** Busy marker for a whole-queue rebuild (reorder); locks every row action. */
 const REORDER_MARK = '__reorder__'
 
-/** localStorage key for the manual collapse state (dsh-queue-plus parity). */
-const COLLAPSE_KEY = 'dsh-input-traffic:collapsed'
+/**
+ * localStorage key for the MANUAL collapse state. Deliberately versioned v2:
+ * v1 was also written by an auto-collapse (empty-queue) path, so a stored v1
+ * value is not necessarily a user decision and must not shadow the new
+ * expanded-by-default layout.
+ */
+const COLLAPSE_KEY = 'dsh-input-traffic:collapsed:v2'
 
 /** Queue operations injected by the session-scoped registration. */
 export interface SteerQueueDockInjected {
@@ -172,13 +180,15 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   // Drag-and-drop reorder source index and the current drop-target row.
   const dragIndex = useRef<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
-  // Collapse state persists across mounts (dsh-queue-plus parity).
+  // Collapse state persists across mounts, expanded by default: a multi-row
+  // queue must never hide itself (the information is the point of the dock).
+  // Only a manual toggle ever writes this key.
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const v = localStorage.getItem(COLLAPSE_KEY)
-      return v === null ? true : v === '1'
+      return v === null ? false : v === '1'
     } catch {
-      return true
+      return false
     }
   })
   // Session-level freeze lives in the composer-right control; the dock reads
@@ -196,14 +206,21 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   const editorRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    if (queue.length === 0 && !collapsed) setCollapsed(true)
+    // No auto-collapse when the queue drains: the collapse state belongs to
+    // the user alone. The old effect made every drained queue write `true`
+    // back, so the next multi-row admission re-collapsed against the user.
     // Frozen-row edits use a `frozen:` id that never exists in the dsh queue;
     // skip the stale-check for them so the detached queue stays editable.
     if (editing !== null && !editing.id.startsWith('frozen:') && (!queueMutable || !queue.some(row => row.id === editing.id))) setEditing(null)
-  }, [collapsed, editing, queue, queueMutable])
+  }, [editing, queue, queueMutable])
 
-  // Persist the manual collapse state; clear the confirm timer on unmount.
+  // Persist the manual collapse state (the only writer of COLLAPSE_KEY) and
+  // clear the confirm timer on unmount. The `collapseTouched` latch keeps the
+  // first render from materializing a value: an untouched dock stores
+  // nothing, so the default layout stays a default rather than a decision.
+  const collapseTouched = useRef(false)
   useEffect(() => {
+    if (!collapseTouched.current) return
     try {
       localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0')
     } catch {
@@ -235,6 +252,10 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   // Reordering rebuilds the queue by re-sending texts; non-text rows cannot
   // be re-sent, so sorting is disabled while any such row is queued.
   const reorderUnsupported = queue.some(row => row.text === null)
+  // The red tier works the same way — every displaced row is re-sent — and the
+  // target has to be text itself, so one non-text row anywhere in the pending
+  // set disables the whole action.
+  const interruptUnsupported = reorderUnsupported || steering.some(row => row.text === null)
 
   const applyAction = async (
     itemId: string,
@@ -277,24 +298,80 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
     }
   }
 
-  const steerRow = async (row: { id: string; text: string | null }, tier: Exclude<SteerTier, 'later'>): Promise<void> => {
+  /**
+   * Interrupt the running turn and make ONE row the next input; every other
+   * pending row falls back to a plain queued (green) row in its original
+   * order.
+   *
+   * The host only ever wakes a turn through `followup`, which appends to the
+   * TAIL of next-turn, and the woken driver claims the HEAD. So "submit this
+   * row now" has to be built as: interrupt first (the aborted driver parks the
+   * queue and claims nothing while it quiesces), take every other row out,
+   * re-send this one — it is then the only pending row, hence the head — and
+   * finally put the others back in order.
+   * @param row - the row to submit, already known to carry pure text.
+   */
+  const interruptRow = async (row: { id: string; text: string }): Promise<void> => {
     setBusy(row.id)
     try {
-      if (tier === 'now') {
-        // Interrupt, then re-submit: cancel stops the current run (keepInbox),
-        // the row is removed so its identity cannot collide, and re-sending
-        // the text arms the harness wake latch (the converged driver restarts
-        // and processes it as the next turn's input). A plain steer after
-        // cancel would re-insert a message already pending in next-turn and
-        // the inbox rejects the duplicate.
-        await cancel()
-        await updateQueue(row.id, { kind: 'remove' })
-        if (row.text !== null) await send(row.text)
-      } else {
-        await updateQueue(row.id, { kind: 'steer' })
+      await cancel()
+      // Steered (yellow) rows come back last, matching the dock's visual order.
+      const displaced = [...queue.filter(candidate => candidate.id !== row.id), ...steering]
+      const restored: typeof displaced = []
+      let restoreFailed = false
+      for (const candidate of displaced) {
+        try {
+          await updateQueue(candidate.id, { kind: 'remove' })
+          restored.push(candidate)
+        } catch (error) {
+          // queue-item-not-found: the agent claimed it before the interruption
+          // landed — re-sending would duplicate a message it already owns.
+          if (!(error instanceof Error) || !error.message.includes('queue-item-not-found')) restoreFailed = true
+        }
       }
+      try {
+        await updateQueue(row.id, { kind: 'remove' })
+      } catch {
+        // Claimed already: the re-send below is still what makes it the next
+        // input, so a stale row identity is not fatal here.
+      }
+      try {
+        await send(row.text)
+      } finally {
+        // A failed target send must not swallow the rest of the user's queue.
+        for (const candidate of restored) {
+          if (candidate.text === null) continue
+          try {
+            await send(candidate.text)
+          } catch {
+            restoreFailed = true
+          }
+        }
+      }
+      if (restoreFailed) notify('error', t('steer.nowFailed'))
     } catch {
-      notify('error', tier === 'now' ? t('steer.nowFailed') : t('steer.nextFailed'))
+      notify('error', t('steer.nowFailed'))
+    } finally {
+      setBusy(current => current === row.id ? null : current)
+    }
+  }
+
+  const steerRow = async (row: { id: string; text: string | null }, tier: Exclude<SteerTier, 'later'>): Promise<void> => {
+    if (tier === 'now') {
+      // The button is disabled for these rows; this is the defensive path for a
+      // queue that changed between render and click.
+      if (row.text === null || interruptUnsupported) {
+        notify('error', t('steer.now.unsupported'))
+        return
+      }
+      await interruptRow({ id: row.id, text: row.text })
+      return
+    }
+    setBusy(row.id)
+    try {
+      await updateQueue(row.id, { kind: 'steer' })
+    } catch {
+      notify('error', t('steer.nextFailed'))
     } finally {
       setBusy(current => current === row.id ? null : current)
     }
@@ -446,7 +523,7 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
             aria-controls={listId}
             aria-expanded={expanded}
             disabled={queue.length <= 1 || interactionActive}
-            onClick={() => { setCollapsed(value => !value) }}
+            onClick={() => { collapseTouched.current = true; setCollapsed(value => !value) }}
           >
             <span className={css.lead} aria-hidden><IconQueueOutlineMedium /></span>
             {queue.length > 0 && (
@@ -812,13 +889,13 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
                         </button>
                       </Tooltip>
                       <span className={css.plan} role="group" aria-label={t('steer.later.aria')}>
-                        <Tooltip label={t('steer.now')} side="bottom" delayMs={500} disabled={planDisabled || row.text === null}>
+                        <Tooltip label={t('steer.now')} side="bottom" delayMs={500} disabled={planDisabled || interruptUnsupported}>
                           <button
                             type="button"
                             className={`${css.tier} ${css.tierNow}`}
                             aria-label={t('steer.now')}
-                            title={planDisabled ? t('steer.unavailable.running') : row.text === null ? t('steer.now.unsupported') : undefined}
-                            disabled={busy !== null || planDisabled || row.text === null}
+                            title={planDisabled ? t('steer.unavailable.running') : interruptUnsupported ? t('steer.now.unsupported') : undefined}
+                            disabled={busy !== null || planDisabled || interruptUnsupported}
                             onClick={() => { void steerRow(row, 'now') }}
                           >
                             <span className={css.dot} aria-hidden />

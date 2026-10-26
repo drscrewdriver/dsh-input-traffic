@@ -18,7 +18,7 @@ function snapshot(queue: ConversationSnapshot['queue'], overrides: Partial<Conve
   return { running: true, subagent: null, queue, ...overrides }
 }
 
-function mount(snap: ConversationSnapshot, draft = '') {
+function dockProps(snap: ConversationSnapshot, draft = '') {
   const updateQueue = vi.fn().mockResolvedValue(undefined)
   const cancel = vi.fn().mockResolvedValue(undefined)
   const send = vi.fn().mockResolvedValue(undefined)
@@ -46,8 +46,13 @@ function mount(snap: ConversationSnapshot, draft = '') {
     notify,
     t,
   } as unknown as SteerQueueDockProps
-  const view = render(<SteerQueueDock {...props} />)
-  return { view, updateQueue, cancel, send, setDraft, notify, t, props }
+  return { props, updateQueue, cancel, send, setDraft, notify, t }
+}
+
+function mount(snap: ConversationSnapshot, draft = '') {
+  const harness = dockProps(snap, draft)
+  const view = render(<SteerQueueDock {...harness.props} />)
+  return { view, ...harness }
 }
 
 describe('planActionFor', () => {
@@ -148,6 +153,55 @@ describe('SteerQueueDock', () => {
     expect(removeCall).toBeLessThan(sendCall)
   })
 
+  it('red on a tail row submits ONLY that row; the rest fall back to the queued band', async () => {
+    const { updateQueue, cancel, send } = mount(snapshot([
+      queueRow('m1', 'a'),
+      queueRow('m2', 'b'),
+      queueRow('m3', 'c'),
+      queueRow('m4', 'd'),
+    ]))
+    // The red button of a MIDDLE row (c), with rows on both sides of it.
+    const target = screen.getByText('c').closest('li')
+    await act(async () => {
+      fireEvent.click(target?.querySelector('[aria-label="steer.now"]') as Element)
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+    // Every pending row leaves the queue first: a re-sent row lands at the
+    // tail, so any row left behind would be claimed before the target.
+    for (const id of ['m1', 'm2', 'm3', 'm4']) {
+      expect(updateQueue).toHaveBeenCalledWith(id, { kind: 'remove' })
+    }
+    // The target goes back alone (it is then the only pending row, hence the
+    // head), and the displaced rows follow in their original order.
+    expect(send.mock.calls.map(call => call[0])).toEqual(['c', 'a', 'b', 'd'])
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('red withdraws steered (yellow) rows back to the queued band', async () => {
+    const steered = { id: 's1', messageId: 's1', placement: 'steering' as const, preview: 's', text: 's', content: [] }
+    const { updateQueue, send } = mount(snapshot([queueRow('m1', 'a'), steered]))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.now' }))
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+    // A cancelled turn has no next step left to steer into: the yellow row is
+    // taken out and re-sent as a plain queued row, after the target.
+    expect(updateQueue).toHaveBeenCalledWith('s1', { kind: 'remove' })
+    expect(send.mock.calls.map(call => call[0])).toEqual(['a', 's'])
+  })
+
+  it('locks the red tier while any pending row is non-text', () => {
+    mount(snapshot([
+      queueRow('m1', 'a'),
+      { id: 'm2', messageId: 'm2', placement: 'queued' as const, preview: '[file]', text: null, content: [] },
+    ]))
+    // The interruption re-sends every touched row and text is all it can
+    // carry, so one attachment row locks the whole action — not just its own.
+    const nowButtons = screen.getAllByRole('button', { name: 'steer.now' })
+    expect(nowButtons.length).toBe(2)
+    expect(nowButtons.every(button => button.hasAttribute('disabled'))).toBe(true)
+  })
+
   it('move up rebuilds the queue in the new order (remove all, resend ordered)', async () => {
     const rows = [
       { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
@@ -155,12 +209,7 @@ describe('SteerQueueDock', () => {
       { id: 'm3', messageId: 'm3', placement: 'queued' as const, preview: 'c', text: 'c', content: [] },
     ]
     const { view, updateQueue, send } = mount(snapshot(rows))
-    // Expand the collapsed list first (multiple rows default to a header).
-    const header = view.container.querySelector('button[aria-controls]')
-    expect(header).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(header as Element)
-    })
+    // Rows are expanded by default; no header click needed.
     // Move the last row (c) up once: a, c, b.
     const row = screen.getByText('c').closest('li')
     const moveUp = row?.querySelector('[aria-label="steer.moveUp"]')
@@ -182,11 +231,7 @@ describe('SteerQueueDock', () => {
       { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: '[image]', text: null, content: [] },
       { id: 'm2', messageId: 'm2', placement: 'queued' as const, preview: 'b', text: 'b', content: [] },
     ]
-    const { view } = mount(snapshot(rows))
-    const header = view.container.querySelector('button[aria-controls]')
-    await act(async () => {
-      fireEvent.click(header as Element)
-    })
+    mount(snapshot(rows))
     const moveUp = screen.getAllByRole('button', { name: 'steer.moveUp' })
     const moveDown = screen.getAllByRole('button', { name: 'steer.moveDown' })
     expect(moveUp[0]?.hasAttribute('disabled')).toBe(true)
@@ -337,12 +382,31 @@ describe('SteerQueueDock', () => {
     }
   })
 
-  it('collapses multiple rows behind the count header by default', () => {
+  it('expands multiple rows by default (a multi-row queue never hides itself)', () => {
     const { view } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
-    // The count header shows the queue length and the list starts collapsed.
+    // The count header still shows the queue length, but every row stays visible.
     expect(screen.getByText('2')).toBeTruthy()
-    const list = view.container.querySelector('ul[hidden]')
-    expect(list).toBeTruthy()
+    expect(view.container.querySelector('ul[hidden]')).toBeNull()
+    expect(screen.getByText('a')).toBeTruthy()
+    expect(screen.getByText('b')).toBeTruthy()
+  })
+
+  it('does not materialize a collapse state the user never chose', () => {
+    mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
+    // The default layout must stay a default, not a stored decision.
+    expect(localStorage.getItem('dsh-input-traffic:collapsed:v2')).toBeNull()
+  })
+
+  it('keeps the manual fold when the queue drains (no auto-collapse)', () => {
+    const { view } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
+    // The user folds it by hand.
+    fireEvent.click(view.container.querySelector('button[aria-controls]') as Element)
+    expect(view.container.querySelector('ul[hidden]')).toBeTruthy()
+    // The queue drains while the turn still runs: the dock stays mounted and
+    // the fold holds. The old effect re-collapsed here and fought the user.
+    const drained = dockProps(snapshot([], { running: true }))
+    view.rerender(<SteerQueueDock {...drained.props} />)
+    expect(view.container.querySelector('ul[hidden]')).toBeTruthy()
   })
 })
 
@@ -481,10 +545,7 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
       queueRow('m3', 'c'),
     ]
     const { view, updateQueue, send } = mount(snapshot(rows))
-    // Expand the collapsed list.
-    const header = view.container.querySelector('button[aria-controls]')
-    expect(header).toBeTruthy()
-    await act(async () => { fireEvent.click(header as Element) })
+    // Rows are expanded by default.
 
     const items = view.container.querySelectorAll('li')
     expect(items).toHaveLength(3)
@@ -508,10 +569,7 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
     const { view, updateQueue, send, notify } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
     // The agent claims the first row while the reorder removes it.
     updateQueue.mockRejectedValueOnce(new Error('queue-item-not-found'))
-    // Expand the collapsed list so the row actions are visible.
-    const header = view.container.querySelector('button[aria-controls]')
-    expect(header).toBeTruthy()
-    await act(async () => { fireEvent.click(header as Element) })
+    // Rows are visible by default; no expand click is needed to reach them.
     // Use the move-down button to trigger a reorder.
     await act(async () => {
       fireEvent.click(screen.getAllByRole('button', { name: 'steer.moveDown' })[0] as Element)
@@ -522,19 +580,19 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
   })
 
   it('remembers the manual collapse state across mounts', () => {
-    // Persisted as expanded.
+    // Persisted as folded by a previous manual toggle.
     try {
-      localStorage.setItem('dsh-input-traffic:collapsed', '0')
+      localStorage.setItem('dsh-input-traffic:collapsed:v2', '1')
     } catch {
       /* ignore */
     }
     const { view } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
-    // With persisted expanded state the list is visible without a click.
-    expect(view.container.querySelector('ul[hidden]')).toBeNull()
-    // Toggling the header persists the collapsed state.
+    // The stored manual fold wins over the expanded default.
+    expect(view.container.querySelector('ul[hidden]')).toBeTruthy()
+    // Toggling the header persists the expanded state.
     const header = view.container.querySelector('button[aria-controls]')
     expect(header).toBeTruthy()
     fireEvent.click(header as Element)
-    expect(localStorage.getItem('dsh-input-traffic:collapsed')).toBe('1')
+    expect(localStorage.getItem('dsh-input-traffic:collapsed:v2')).toBe('0')
   })
 })

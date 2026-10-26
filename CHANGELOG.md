@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.7.7 (2026-10-27)
+
+两条外部 issue（feidky）的修复；无宿主兼容面变更，`engines.dsh` 枚举与 peers 保持 0.7.6。
+
+### 修复：多条排队时自动折叠，与用户抢开关（issue #4）
+
+- 多条排队**默认展开**（`listVisible` 仍保留单条直显）：排队信息的价值就是看得见。
+- 删除「队列清空 → `setCollapsed(true)`」的自动收回 effect；折叠态只由用户手动决定。
+- 持久化键升 v2（`dsh-input-traffic:collapsed:v2`）：v1 的值含自动折叠写入的结果，
+  不是用户选择，不能压过新默认值。
+- `collapseTouched` latch：未手动点过表头前**不写存储**，避免首帧把默认值物化成决定。
+
+### 修复：红档「打断并输入」在多条排队时投了队首行（issue #3）
+
+- 根因（确定性，非竞态）：宿主唤醒只经 `followup`，而 `followup` 永远追加到 `next-turn`
+  尾部（`agent.ts` `inbox.splice(…, Infinity, …)`），唤醒后 driver 按 FIFO 取**队首**。
+  旧实现 `cancel → remove(目标) → send(目标)` 让目标落在队尾，被消费的是队首。
+  另：`conversation.send()` 的 mode 硬编码为 `queue`，与 `busyEnter` 设置无关。
+- 新流程：`cancel`（宿主 park 队列，收敛期不 claim）→ 摘出全部其它行 →
+  `send(目标)`（此时唯一，即队首）→ 其余行按原序重投。
+- 语义：红档只投入当条；其余行（含黄档插入行）统一降级回绿色等待档——
+  被打断的回合不存在「下一个 step」可插入。
+- 顺序：`cancel` 提到最前，所有摘取都发生在 park 之后，去掉「摘到一半被消费」的窗口。
+- `send(目标)` 失败时仍恢复其余排队行（try/finally），不吞队列；
+  `queue-item-not-found` 视为已被宿主取走，该行不重投（避免重复投递）。
+
+### 限制：附件行仍锁红档
+
+- 重投只有 `send(text)` 一条通道：`file` 块的 `receiptId` 一次性、无反向解析；
+  图片需 `readAttachment` 回读字节（未实现）。
+- 因此待处理行含非文本内容时**整队**红档禁用（不只那一条），文案改为队列口径（9 语）。
+- 根治需宿主提供队列位置操作（`move` / `prepend`），届时红档与重排的附件锁可一并解除。
+
 0.7.6: host enumeration addendum for DSH 0.2.1-rc.3 (declaration-only bump; contract plane zero diff).
 
 ## 0.7.5 (2026-10-18)
