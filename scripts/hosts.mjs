@@ -33,16 +33,16 @@ export const supportedHosts = Object.freeze([
   // 0.2.0 线（2 个 rc）
   '0.2.0-rc.1',
   '0.2.0-rc.2',
-  // 0.2.1 线（2 个 rc）
+  // 0.2.1 线（3 个 rc）
   '0.2.1-rc.1',
-  '0.2.1-rc.2', '0.2.1-rc.3',
+  '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4',
 ])
 
 /** peerDependencies / engines.dsh 共用的枚举串（精确枚举无暗坑，INDEX §B）。 */
 export const peerRange = supportedHosts.join(' || ')
 
 /** 本地开发与矩阵默认宿主（devDependencies 若引入宿主包一律钉这里）。 */
-export const developmentHost = '0.2.1-rc.3'
+export const developmentHost = '0.2.1-rc.4'
 
 /**
  * peer 闸门指向的宿主子包（本插件 client 半区实际消费的宿主契约面；六包经
