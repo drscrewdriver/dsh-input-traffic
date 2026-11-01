@@ -68,6 +68,11 @@ export interface FamilyHostSectionProps {
   useTabs?: <S>(selector: (value: readonly FamilyTabEntry[]) => S) => S
   hooks?: { tabs: HostObservable<readonly FamilyTabEntry[]> }
   renderContributor?: (id: string) => JSX.Element | null
+  /** 接管态内联直挂本插件自己的卡：自宣子槽不触发自身 inject（账本恒无己卡），
+   * 故不能靠 renderSlot/renderContributor 取回。缺省（未传）时行为与旧一致。 */
+  renderOwn?: () => ReactNode
+  /** 内联 own 行的账本 id（与账本条目去重用）；仅 renderOwn 存在时生效。 */
+  ownId?: string
 }
 
 const NO_TABS: readonly FamilyTabEntry[] = []
@@ -81,16 +86,25 @@ export function FamilyHostSection(props: FamilyHostSectionProps): JSX.Element {
     return raw.subscribe(() => setPolled(raw.getSnapshot()))
   })
   const tabs = props.useTabs !== undefined ? props.useTabs(value => value) : polled
+  // 接管时本插件既是容器 owner 又是成员：自己声明的 dsh-family.tab 不会触发
+  // 自身 inject（账本恒无本卡），故把本卡作为 OWN 行内联直挂、其余成员仍走账本；
+  // 若本卡已在账本（外部 owner 在场、自身 inject 已触发）则去重不双渲。对齐 thinking-levels OWN_TAB_ID。
+  const ownId = props.ownId ?? '__own__'
+  const rows: readonly FamilyTabEntry[] = props.renderOwn
+    ? [{ id: ownId, order: Number.NEGATIVE_INFINITY, label: ownId }, ...tabs.filter(tab => tab.id !== ownId)]
+    : tabs
   return createElement(
     'div',
     { style: { display: 'grid', gap: '12px' } },
-    tabs.map(row =>
+    rows.map(row =>
       createElement(
         'div',
         { key: row.id },
-        props.renderSlot
-          ? props.renderSlot(FAMILY_CHILD_KEY, {}, { only: row.id, fallback: null })
-          : props.renderContributor?.(row.id) ?? null,
+        props.renderOwn && row.id === ownId
+          ? props.renderOwn()
+          : props.renderSlot
+            ? props.renderSlot(FAMILY_CHILD_KEY, {}, { only: row.id, fallback: null })
+            : props.renderContributor?.(row.id) ?? null,
       ),
     ),
   )
@@ -145,6 +159,7 @@ export function claimFamilyHostIfOrphaned(
   isHeld: () => boolean,
   label: () => string,
   log: string,
+  ownTab?: { id: string; component: unknown; inject?: () => Record<string, unknown> },
 ): () => void {
   let disposeClaim: (() => void) | undefined
   let claimed = false
@@ -177,7 +192,14 @@ export function claimFamilyHostIfOrphaned(
           order: 40,
           priority: FAMILY_HOST_PRIORITY,
           label,
-          inject: () => ({ hooks: { tabs: ledger }, renderContributor }),
+          inject: () => ({
+            hooks: { tabs: ledger },
+            renderContributor,
+            ownId: ownTab?.id,
+            renderOwn: ownTab === undefined
+              ? undefined
+              : () => createElement(ownTab.component as (p: unknown) => ReactNode, ownTab.inject ? ownTab.inject() : {}),
+          }),
           children: { [FAMILY_CHILD_KEY]: { kind: 'list', scope: 'root' } },
         },
         FamilyHostSection,
