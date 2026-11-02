@@ -53,6 +53,32 @@ export declare function planActionFor(tier: SteerTier): {
  */
 export declare function badgeFor(placement: 'queued' | 'steering' | 'context'): SteerTier | null;
 /**
+ * Whether one `next-step` inbox row is a steer the person typed, rather than
+ * context some producer injected into the same band.
+ *
+ * The host merges two different things into `next-step`:
+ * - a human steer — `source.kind === 'user'` (the web controller stamps it with
+ *   an `rpcId`), the yellow tier this dock exists to plan;
+ * - model-facing context pushed by a service or plugin with its own
+ *   `source.kind` — the host's own `user-approval` / `policy` / `time-context`
+ *   notices, and third-party notes such as perm-gate's block opinion.
+ *
+ * Only the first is an input the person still owns. Drawing the second as a
+ * planned message put host notices (“The approval policy changed…”​) into the
+ * waiting area with edit / reorder / resend affordances that cannot work on
+ * them, and competed with the user's own queue for attention.
+ *
+ * Lenient on purpose: a row with no `source` at all (local fixtures, older
+ * hosts) stays visible, so nothing legitimately queued can disappear.
+ * @param row - one `next-step` inbox row.
+ * @returns true when the row is a human steer.
+ */
+export declare function isHumanSteer(row: {
+    readonly source?: {
+        readonly kind?: string;
+    };
+}): boolean;
+/**
  * Auto-grow one edit textarea to its content. The CSS max-height caps the
  * growth; beyond it the textarea scrolls internally. Height is reset first so
  * shrink (deleting lines) also tracks the content.

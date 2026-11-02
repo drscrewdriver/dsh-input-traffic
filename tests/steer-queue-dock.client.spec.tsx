@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
-import { SteerQueueDock, planActionFor, badgeFor, resizeEditor } from '../src/client/steer-queue-dock.tsx'
+import { SteerQueueDock, planActionFor, badgeFor, isHumanSteer, resizeEditor } from '../src/client/steer-queue-dock.tsx'
 import type { SteerQueueDockInjected, SteerQueueDockProps } from '../src/client/steer-queue-dock.tsx'
 import { freezeStore, resetFreezeStore } from '../src/client/freeze-store.ts'
 
@@ -71,6 +71,16 @@ describe('badgeFor', () => {
   })
 })
 
+describe('isHumanSteer', () => {
+  it('accepts a human steer and rejects injected context', () => {
+    expect(isHumanSteer({})).toBe(true)
+    expect(isHumanSteer({ source: { kind: 'user' } })).toBe(true)
+    // Host notices and third-party opinions share the band but are not inputs.
+    expect(isHumanSteer({ source: { kind: 'user-approval' } })).toBe(false)
+    expect(isHumanSteer({ source: { kind: 'perm-gate' } })).toBe(false)
+  })
+})
+
 describe('resizeEditor', () => {
   it('grows the textarea to its scroll height after resetting it', () => {
     const el = document.createElement('textarea')
@@ -122,6 +132,38 @@ describe('SteerQueueDock', () => {
     expect(screen.queryByRole('button', { name: 'steer.now' })).toBeNull()
     expect(screen.getByRole('button', { name: 'steer.revoke' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'steer.clear' })).toBeTruthy()
+  })
+
+  it('keeps injected next-step context out of the waiting area', () => {
+    // The host's own approval notice rides the same `next-step` band as a human
+    // steer; listing it here offered edit/reorder/resend on something the person
+    // never typed (screenshot regression).
+    const notice = {
+      id: 'n1',
+      messageId: 'n1',
+      placement: 'steering' as const,
+      preview: 'The approval policy changed from "ask" to "never" (changed by the user).',
+      text: 'The approval policy changed from "ask" to "never" (changed by the user).',
+      content: [],
+      source: { kind: 'user-approval' },
+    } as unknown as ConversationSnapshot['queue'][number]
+    const { view } = mount(snapshot([notice]))
+    expect(view.container.textContent).not.toContain('approval policy changed')
+    expect(screen.queryByRole('button', { name: 'steer.revoke' })).toBeNull()
+  })
+
+  it('still lists a human steer sitting in the same band', () => {
+    const human = {
+      id: 'h1',
+      messageId: 'h1',
+      placement: 'steering' as const,
+      preview: 'human steer',
+      text: 'human steer',
+      content: [],
+      source: { kind: 'user', rpcId: 'r1' },
+    } as unknown as ConversationSnapshot['queue'][number]
+    mount(snapshot([human]))
+    expect(screen.getByText('human steer')).toBeTruthy()
   })
 
   it('green on a steering row revokes it back to later (remove + resend)', async () => {

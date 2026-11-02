@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### 修复：注入上下文不再占位等待区
+
+`next-step` 带里混着两类行：人真的插的话（`source.kind === 'user'`，web 控制器会给它盖上 `rpcId`），与服务/插件推给模型的上下文（宿主自己的 `user-approval` / `policy` / `time-context` 通知，以及第三方插件的意见）。旧实现把整个 `next-step` 都当“🟡 插话中”画出来，于是“The approval policy changed from "ask" to "never"”这类系统通知出现在用户的等待区里，还带着编辑 / 重排 / 重发按钮——那是对着不是人写的东西开的操作。现在新增纯函数 `isHumanSteer(row)`，黄色带只画真人插话；没带 `source` 的旧行（本地 fixture、老宿主）照旧可见，不会误伤真队列。上下文本身仍照常进模型。
+
 ## 0.7.7 (2026-10-27)
 
 两条外部 issue（feidky）的修复；无宿主兼容面变更，`engines.dsh` 枚举与 peers 保持 0.7.6。
