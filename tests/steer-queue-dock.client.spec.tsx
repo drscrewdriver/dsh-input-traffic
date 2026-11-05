@@ -250,7 +250,7 @@ describe('SteerQueueDock', () => {
       { id: 'm2', messageId: 'm2', placement: 'queued' as const, preview: 'b', text: 'b', content: [] },
       { id: 'm3', messageId: 'm3', placement: 'queued' as const, preview: 'c', text: 'c', content: [] },
     ]
-    const { view, updateQueue, send } = mount(snapshot(rows))
+    const { view: _view, updateQueue, send } = mount(snapshot(rows))
     // Rows are expanded by default; no header click needed.
     // Move the last row (c) up once: a, c, b.
     const row = screen.getByText('c').closest('li')
@@ -586,7 +586,7 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
       queueRow('m2', 'b'),
       queueRow('m3', 'c'),
     ]
-    const { view, updateQueue, send } = mount(snapshot(rows))
+    const { view: _view, updateQueue, send } = mount(snapshot(rows))
     // Rows are expanded by default.
 
     const items = view.container.querySelectorAll('li')
@@ -608,7 +608,7 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
   })
 
   it('rejects the reorder when the queue changed mid-flight instead of scrambling', async () => {
-    const { view, updateQueue, send, notify } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
+    const { view: _view, updateQueue, send, notify } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
     // The agent claims the first row while the reorder removes it.
     updateQueue.mockRejectedValueOnce(new Error('queue-item-not-found'))
     // Rows are visible by default; no expand click is needed to reach them.
