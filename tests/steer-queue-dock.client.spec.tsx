@@ -586,7 +586,7 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
       queueRow('m2', 'b'),
       queueRow('m3', 'c'),
     ]
-    const { view: _view, updateQueue, send } = mount(snapshot(rows))
+    const { view, updateQueue, send } = mount(snapshot(rows))
     // Rows are expanded by default.
 
     const items = view.container.querySelectorAll('li')
