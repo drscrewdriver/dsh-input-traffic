@@ -64,7 +64,7 @@ export declare function badgeFor(placement: 'queued' | 'steering' | 'context'): 
  *   notices, and third-party notes such as perm-gate's block opinion.
  *
  * Only the first is an input the person still owns. Drawing the second as a
- * planned message put host notices (“The approval policy changed…”​) into the
+ * planned message put host notices (“The approval policy changed…”) into the
  * waiting area with edit / reorder / resend affordances that cannot work on
  * them, and competed with the user's own queue for attention.
  *

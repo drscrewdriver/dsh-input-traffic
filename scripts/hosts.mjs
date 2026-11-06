@@ -36,6 +36,8 @@ export const supportedHosts = Object.freeze([
   // 0.2.1 线（3 个 rc）
   '0.2.1-rc.1',
   '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.1-rc.5',
+  // 0.2.2 line
+  '0.2.2-rc.1',
 ])
 
 /** peerDependencies / engines.dsh 共用的枚举串（精确枚举无暗坑，INDEX §B）。 */
