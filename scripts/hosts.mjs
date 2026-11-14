@@ -41,7 +41,9 @@ export const supportedHosts = Object.freeze([
 ])
 
 /** peerDependencies / engines.dsh 共用的枚举串（精确枚举无暗坑，INDEX §B）。 */
-export const peerRange = supportedHosts.join(' || ')
+export const peerRange = `>=${supportedHosts[0]} <0.3.0-0`
+/** 已实测宿主细胞：仅供 README 展示 / 矩阵脚本，不再下发给 peer。 */
+export const hostCells = supportedHosts.join(' || ')
 
 /** 本地开发与矩阵默认宿主（devDependencies 若引入宿主包一律钉这里）。 */
 export const developmentHost = '0.2.1-rc.5'
