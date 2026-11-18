@@ -1,4 +1,4 @@
-/** `steer` client dictionaries (zh / en / ja / ko). */
+/** `steer` client dictionaries (zh / en / ja / ko / fr / de / it / ru / es / pt). */
 /** Dictionary namespace owned by this plugin. */
 export declare const NS = "steer";
 /** Simplified Chinese dictionary (the key-set source of truth). */
@@ -72,7 +72,9 @@ export declare const it: Record<keyof typeof zh, string>;
 export declare const ru: Record<keyof typeof zh, string>;
 /** Spanish dictionary (keys mirror zh). */
 export declare const es: Record<keyof typeof zh, string>;
-/** Combined dictionary map covering all 9 languages. */
+/** Brazilian Portuguese dictionary (keys mirror zh). */
+export declare const pt: Record<keyof typeof zh, string>;
+/** Combined dictionary map covering all 10 languages. */
 export declare const dictionaries: Record<string, Record<string, string>>;
 /** Dictionary key union. */
 export type SteerKey = keyof typeof zh;

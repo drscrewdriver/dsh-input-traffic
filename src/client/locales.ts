@@ -1,4 +1,4 @@
-/** `steer` client dictionaries (zh / en / ja / ko). */
+/** `steer` client dictionaries (zh / en / ja / ko / fr / de / it / ru / es / pt). */
 
 /** Dictionary namespace owned by this plugin. */
 export const NS = 'steer'
@@ -507,8 +507,64 @@ export const es: Record<keyof typeof zh, string> = {
   'steer.resumeFailed': 'Error al reanudar, int\u00e9ntelo de nuevo.',
 }
 
-/** Combined dictionary map covering all 9 languages. */
-export const dictionaries: Record<string, Record<string, string>> = { zh, en, ja, ko, fr, de, it, ru, es }
+/** Brazilian Portuguese dictionary (keys mirror zh). */
+export const pt: Record<keyof typeof zh, string> = {
+  'family.title': 'Tráfego de entrada',
+  'family.busyEnter': 'Comportamento do Enter em ocupado (gerenciado por este plugin)',
+  'family.desc': 'Com o agente ocupado, o Enter simples enfileira a mensagem em vez de interromper; para intervir, use os controles de congelar/interagir da área de entrada. Esse comportamento é assumido automaticamente por este plugin, nada a configurar.',
+  'queue.count': '{n} mensagens na fila',
+  'queue.edit': 'Editar mensagem da fila',
+  'queue.edit.unsupported': 'Contém conteúdo não textual; a edição não é compatível',
+  'queue.save': 'Salvar mensagem da fila',
+  'queue.cancelEdit': 'Cancelar edição',
+  'queue.remove': 'Remover mensagem da fila',
+  'queue.removeFailed': 'Falha ao remover: a mensagem pode ter começado a ser enviada.',
+  'queue.editFailed': 'Falha ao editar: a mensagem pode ter começado a ser enviada.',
+  'queue.editFailed.pulledBack': 'Falha ao editar; o conteúdo voltou para a caixa de entrada, revise e envie novamente.',
+  'steer.inflight': '{n} em inserção',
+  'steer.now': 'Interromper e enviar',
+  'steer.now.aria': 'Vermelho: interrompe a ação em execução e envia agora',
+  'steer.now.unsupported': 'A fila contém conteúdo não textual; a interrupção não é compatível',
+  'steer.nowFailed': 'Falha ao interromper, tente novamente.',
+  'steer.next': 'Enviar após a ação',
+  'steer.next.aria': 'Amarelo: insere depois que a ação atual terminar',
+  'steer.nextFailed': 'Falha ao enviar como aparte, tente novamente.',
+  'steer.later': 'Enfileirar para o próximo turno',
+  'steer.later.aria': 'Verde: enfileira; processado depois que todas as ações anteriores terminarem',
+  'steer.revoke': 'Retirar para a fila',
+  'steer.revoke.aria': 'Verde: cancela a inserção e enfileira para o próximo turno',
+  'steer.revoke.unsupported': 'Contém conteúdo não textual; a retirada não é compatível',
+  'steer.revokeFailed': 'Falha ao retirar para a fila, tente novamente.',
+  'steer.moveUp': 'Mover para cima',
+  'steer.moveDown': 'Mover para baixo',
+  'steer.reorder.unsupported': 'Contém conteúdo não textual; a reordenação não é compatível',
+  'steer.reorderFailed': 'Falha ao reordenar, tente novamente.',
+  'steer.reorderStale': 'A fila mudou; esta reordenação foi cancelada, tente novamente.',
+  'steer.dragReorder': 'Arraste para reordenar',
+  'steer.pullBack': 'Editar na caixa de entrada',
+  'steer.pullBack.unsupported': 'Contém conteúdo não textual; devolver à caixa de entrada não é compatível',
+  'steer.pullBack.composerBusy': 'A caixa de entrada já tem conteúdo; envie ou limpe antes de devolver',
+  'steer.pullBackFailed': 'Falha ao devolver à caixa de entrada, tente novamente.',
+  'steer.badge.now': 'interrompendo',
+  'steer.badge.next': 'aparte',
+  'steer.badge.later': 'na fila',
+  'steer.unavailable.running': 'O planejamento exige uma sessão em execução',
+  'steer.clear': 'Cancelar e limpar',
+  'steer.clear.confirm': 'Confirmar a limpeza?',
+  'steer.clear.cancel': 'Cancelar a limpeza',
+  'steer.clear.aria': 'Cancela a execução atual e limpa todas as mensagens da fila',
+  'steer.clearFailed': 'Falha ao cancelar e limpar, tente novamente.',
+  'steer.freeze': 'Congelar e enfileirar',
+  'steer.resume': 'Retomar e enfileirar',
+  'steer.frozen': 'Congelado: o turno atual termina e a fila pausa até a retomada',
+  'steer.frozenInput': 'Congelado: a entrada está pausada, retome para continuar',
+  'steer.frozenBadge': 'congelado',
+  'steer.freezeFailed': 'Falha ao congelar, tente novamente.',
+  'steer.resumeFailed': 'Falha ao retomar, tente novamente.',
+}
+
+/** Combined dictionary map covering all 10 languages. */
+export const dictionaries: Record<string, Record<string, string>> = { zh, en, ja, ko, fr, de, it, ru, es, pt }
 
 /** Dictionary key union. */
 export type SteerKey = keyof typeof zh

@@ -5,6 +5,7 @@
 - [English changelog](./CHANGELOG.md)
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
+- [Português changelog](./CHANGELOG.pt.md)
 
 ## 0.5.5 — 2026-09-30
 

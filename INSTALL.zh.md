@@ -6,13 +6,16 @@
 - [English installation guide](./INSTALL.md)
 - [日本語インストールガイド](./INSTALL.ja.md)
 - [한국어 설치 안내](./INSTALL.ko.md)
+- [Português guia de instalação](./INSTALL.pt.md)
 - [中文 README](./README.md)
 - [English README](./README.en.md)
 - [日本語 README](./README.ja.md)
 - [한국어 README](./README.ko.md)
+- [Português README](./README.pt.md)
 - [版本更新日志](./CHANGELOG.md)
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
+- [Português changelog](./CHANGELOG.pt.md)
 
 本指南中的占位符：
 

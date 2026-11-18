@@ -3,16 +3,19 @@
 이 가이드는 공식 `dsh plugin` 명령만 사용합니다. 이 명령은 의존성을 profile에 설치하고 `dsh.profile.bundles`를 동기화합니다. 일반 `npm install`, profile에서 직접 `pnpm add`, profile 매니페스트 수동 편집으로 대체하지 마세요.
 
 - [한국어 설치 안내](./INSTALL.ko.md)
+- [Português guia de instalação](./INSTALL.pt.md)
 - [English installation guide](./INSTALL.md)
 - [中文安装指南](./INSTALL.zh.md)
 - [日本語インストールガイド](./INSTALL.ja.md)
 - [한국어 README](./README.ko.md)
+- [Português README](./README.pt.md)
 - [English README](./README.en.md)
 - [中文 README](./README.md)
 - [日本語 README](./README.ja.md)
 - [Changelog](./CHANGELOG.md)
 - [日本語 changelog](./CHANGELOG.ja.md)
 - [한국어 changelog](./CHANGELOG.ko.md)
+- [Português changelog](./CHANGELOG.pt.md)
 
 이 가이드의 자리표시자:
 

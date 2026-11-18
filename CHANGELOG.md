@@ -28,6 +28,8 @@ issue #5 的三个次生缺陷里，两个在源码上成立且已修；第三�
 
 报告里已验证的两条缓解路径（滞留后自动冻结 / 滞留后自动重投）都能用，但它们都需要判定「idle + 队列非空 = 滞留」，而这个判据在**宿主正常排空**的瞬间也成立（`running` 由投影驱动，存在跨帧的空窗）。误判的代价是打断一次正常续转 —— 比它要解决的问题更糟。所以本轮不落地，先在 README 记明这一态的恢复动作。
 
+- i18n: add Portuguese (pt-BR) locale — runtime dictionary, package metadata and README/INSTALL/CHANGELOG mirrors.
+
 ## 0.7.15 (2026-11-17)
 
 ### 修复：0.7.14 的 peer 区间让安装器解不出 rc，包装不上
