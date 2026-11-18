@@ -1,6 +1,6 @@
 {
   "name": "dsh-input-traffic",
-  "version": "0.7.15",
+  "version": "0.7.16",
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "tag": "latest"

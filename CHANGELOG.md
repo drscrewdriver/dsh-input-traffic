@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.7.16 (2026-11-18)
+
+issue #5 的三个次生缺陷里，两个在源码上成立且已修；第三个（滞留态无恢复入口）是宿主侧派发链断裂，本轮不碰，见下方说明。
+
+### 修复：删空冻结队列后卡在假冻结态
+
+`freeze-store` 的四个 mutator（`updatePendingAt` / `setTierAt` / `removePendingAt` / `movePending`）都把状态硬编码成 `{ frozen: true, pending: next }`。删掉最后一条 pending 后留下 `{ frozen: true, pending: [] }` —— 徽标永不消失，而新消息照发，纯显示残留。
+
+改为经 `writePending()` 派生：`frozen = cur.frozen && pending.length > 0`。队列空即解冻，非空时 mutator 不得篡改用户显式设的冻结态。`freezeStore.set` 本来就会在「未冻结且空列表」时删掉会话，所以这里只需把标志位算对。
+
+**连带修掉一个镜像缺陷**（报告未提）：composer block 只由 `resume()` 放下。队列被 dock 删空后 store 变成未冻结、横幅消失，但**输入框仍然 inert** —— 看得见的冻结没了、看不见的锁还在。现在 `FreezeButton` 用 `raisedBlock` 记住「这个控件举的 block」，store 报未冻结时自动放下；只清自己举的，不与其它 raiser 抢。
+
+### 修复：官方队列条的隐藏规则在 0.2.2-rc.3 上是空的
+
+`HIDE_OFFICIAL_QUEUE_CSS` 原本只有一条 `[class*="_7yHdaG_dock"]` —— css-module 哈希。实测当前宿主构建里 `_7yHdaG` 出现 **0 次**（同模块已重哈希为 `F07MqG`），规则成空：插件 dock 崩溃回落时官方 `QueueDock` 不再被隐藏，它的逐行「插话发送」与我们黄色档重复。
+
+宿主在 dock 根节点上带了自己的稳定属性 `data-queue-dock=""`（`QueueDock.tsx`：`jsx('div', { className: css.dock, 'data-queue-dock': '' })`），与哈希、locale 都无关。现在以 `[data-queue-dock]` 为主规则，哈希规则保留作老宿主兜底。没有用 aria-label 兜底 —— 官方插话按钮与我们黄色档渲染同一个标签，属性规则会误伤自己（旧注释承诺的那条「第二道网」其实不能用）。
+
+### 修复：冻结态翻转被摘队列的远程往返拖住
+
+`freeze()` 原先先 `await Promise.all(updateQueue(...))` 再写 store。每个 `updateQueue` 都是一次远程往返，整段期间按钮文案与徽标都不变 —— 用户以为没生效、再点一次，这是 #5「盲点两下」的一半。现在先写 store（pending 已在此前算好，提前写不会丢队列），再摘队列。
+
+### 未修：撤回后队列滞留（宿主侧）
+
+#5 的主 bug 根因在宿主：`turn()` 的 abort 分支直接 throw，走不到末尾 `hasPending` 的续转返回；`kick()` 收尾的再武装条件 `wakeRequested` 在正常运行期排队时从未置位。插件侧无法在不改宿主派发链的前提下根治。
+
+报告里已验证的两条缓解路径（滞留后自动冻结 / 滞留后自动重投）都能用，但它们都需要判定「idle + 队列非空 = 滞留」，而这个判据在**宿主正常排空**的瞬间也成立（`running` 由投影驱动，存在跨帧的空窗）。误判的代价是打断一次正常续转 —— 比它要解决的问题更糟。所以本轮不落地，先在 README 记明这一态的恢复动作。
+
 ## 0.7.15 (2026-11-17)
 
 ### 修复：0.7.14 的 peer 区间让安装器解不出 rc，包装不上

@@ -15,7 +15,7 @@
  *   下一步先发生），**再**重投队列（later 级条目因此排在自然 next turn 之后，不再插队）。
  * - 本插件只做冻结增强，不承担重试/暂停决策（归后端，D9）。
  */
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { freezeStore } from './freeze-store.ts'
@@ -46,6 +46,10 @@ export function FreezeButton({ useProjection, updateQueue, cancel, send, sendSte
   const sid = sessionId ?? ''
   const { frozen } = useSyncExternalStore(freezeStore.subscribe, () => freezeStore.getSnapshot(sid))
   const inbox = useProjection('inbox')
+  // Whether THIS control is the one holding the composer block. The block is a
+  // shared per-session slot, so lowering it unconditionally would fight other
+  // raisers; we only clear what we raised.
+  const raisedBlock = useRef(false)
 
   const freeze = async (): Promise<void> => {
     // Detach every pending input row — queued (next-turn) and already-steered
@@ -64,16 +68,24 @@ export function FreezeButton({ useProjection, updateQueue, cancel, send, sendSte
     const pending: { text: string; tier: FrozenTier }[] = rows.flatMap(row =>
       typeof row.text === 'string' && row.text !== '' ? [{ text: row.text, tier: steeredIds.has(row.id) ? 'safe_point' : 'queue' }] : [],
     )
+    // Raise the composer block: while frozen the composer is inert, so plain
+    // Enter can never leak a new message into the conversation (busyEnter
+    // only gates busy sessions; an idle/paused session would send directly).
+    raisedBlock.current = true
+    setComposerBlock?.(t('steer.frozenInput'))
+    // Flip the store BEFORE awaiting the detach round-trips: the button label,
+    // the banner and the dock's frozen list all read this store, and every
+    // `updateQueue` is a remote round-trip. Setting it after the awaits left the
+    // control looking unchanged for the whole detach — the "I clicked and
+    // nothing happened, so I clicked again" half of the double-click report in
+    // issue #5. The rows are preserved here first, so an early flip cannot lose
+    // the queue: the detach below only removes them from the live inbox.
+    freezeStore.set(sid, { frozen: true, pending })
     // Detach every pending row: the running turn finishes naturally, then the
     // driver finds no pending work and stops.
     await Promise.all(rows.map(row =>
       updateQueue(row.id, { kind: 'remove' }).catch(() => undefined),
     ))
-    freezeStore.set(sid, { frozen: true, pending })
-    // Raise the composer block: while frozen the composer is inert, so plain
-    // Enter can never leak a new message into the conversation (busyEnter
-    // only gates busy sessions; an idle/paused session would send directly).
-    setComposerBlock?.(t('steer.frozenInput'))
     // 服务端：停掉 session 下一回合（fail-open，session-guard 未装则静默）。
     if (sessionId !== undefined) void sessionGuardStopNextTurn(sessionId)
   }
@@ -82,6 +94,7 @@ export function FreezeButton({ useProjection, updateQueue, cancel, send, sendSte
     const pending = freezeStore.getSnapshot(sid).pending
     freezeStore.set(sid, { frozen: false, pending: [] })
     setComposerBlock?.(undefined)
+    raisedBlock.current = false
     try {
       // 先恢复服务端会话：被打断回合的自然下一步（deferredTools 续跑）先发生。
       // 之后再重投队列 —— later 级条目经 send 进入 next-turn，排在自然 next turn
@@ -101,6 +114,22 @@ export function FreezeButton({ useProjection, updateQueue, cancel, send, sendSte
       notify('error', t('steer.resumeFailed'))
     }
   }
+
+  /**
+   * The dock can empty the frozen queue on its own (delete the last pending row).
+   *
+   * `freeze-store` derives `frozen` from the list now, so the banner goes away —
+   * but the composer block is raised by *this* control, and only `resume()` used
+   * to lower it. Left alone, the input stayed inert with no visible freeze: the
+   * mirror image of the stuck banner reported in issue #5 (defect 2). Lower it
+   * here whenever the store reports unfrozen while we still hold the block.
+   */
+  useEffect(() => {
+    if (!frozen && raisedBlock.current) {
+      raisedBlock.current = false
+      setComposerBlock?.(undefined)
+    }
+  }, [frozen, setComposerBlock])
 
   return (
     <button

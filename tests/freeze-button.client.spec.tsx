@@ -304,3 +304,33 @@ describe('FreezeButton', () => {
     expect(freezeStore.getSnapshot('s2').pending).toEqual([])
   })
 })
+
+describe('issue #5：冻结态必须在摘队列之前就翻转', () => {
+  it('updateQueue 未 resolve 时按钮已显示「恢复」、store 已 frozen', async () => {
+    // 摘队列是逐行远程往返；旧实现把 store 写入放在 await 之后，整段摘除期间
+    // 按钮文案与徽标都不变 —— 用户以为没生效再点一次，这是「盲点两下」的一半。
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: '甲', text: '甲', content: [] },
+      { id: 'm2', messageId: 'm2', placement: 'queued' as const, preview: '乙', text: '乙', content: [] },
+    ]
+    const { view, updateQueue } = mount(snapshot(rows))
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    updateQueue.mockImplementation(() => gate)
+
+    await act(async () => {
+      fireEvent.click(view.container.querySelector('button') as HTMLButtonElement)
+      // 只等一拍：摘队列仍挂起中。
+      await Promise.resolve()
+    })
+
+    expect(freezeStore.getSnapshot('s1').frozen).toBe(true)
+    expect(freezeStore.getSnapshot('s1').pending.map((e) => e.text)).toEqual(['甲', '乙'])
+    expect(view.container.querySelector('button')?.textContent).toContain('steer.resume')
+
+    await act(async () => {
+      release?.()
+      await gate
+    })
+  })
+})

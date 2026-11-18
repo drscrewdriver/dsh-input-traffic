@@ -70,6 +70,23 @@ export function pushPending(sessionId: string, text: string, tier: FrozenTier = 
   freezeStore.set(sessionId, { ...cur, pending: [...cur.pending, { text, tier }] })
 }
 
+/**
+ * Write a mutated pending list back, keeping the session's own `frozen` flag.
+ *
+ * The four mutators below used to hard-code `frozen: true`, which is wrong for
+ * the one case that empties the list: removing the last pending entry left
+ * `{ frozen: true, pending: [] }` behind — the banner stayed up forever while
+ * new messages went straight through, a pure display residue (issue #5, defect
+ * 2). `freezeStore.set` already deletes the session when `frozen === false` and
+ * the list is empty, so deriving the flag here is all that is needed: the queue
+ * emptying is what unfreezes, and an explicit freeze/resume still owns the flag
+ * in every non-empty case.
+ */
+function writePending(sessionId: string, pending: readonly FrozenEntry[]): void {
+  const cur = states.get(sessionId) ?? EMPTY
+  freezeStore.set(sessionId, { frozen: cur.frozen && pending.length > 0, pending })
+}
+
 /** Edit one detached queued message's text in place. */
 export function updatePendingAt(sessionId: string, index: number, text: string): void {
   const pending = states.get(sessionId)?.pending
@@ -78,7 +95,7 @@ export function updatePendingAt(sessionId: string, index: number, text: string):
   if (entry === undefined) return
   const next = [...pending]
   next[index] = { ...entry, text }
-  freezeStore.set(sessionId, { frozen: true, pending: next })
+  writePending(sessionId, next)
 }
 
 /** Change one detached queued message's planned insertion tier. */
@@ -89,14 +106,14 @@ export function setTierAt(sessionId: string, index: number, tier: FrozenTier): v
   if (entry === undefined) return
   const next = [...pending]
   next[index] = { ...entry, tier }
-  freezeStore.set(sessionId, { frozen: true, pending: next })
+  writePending(sessionId, next)
 }
 
 /** Remove one detached queued message. */
 export function removePendingAt(sessionId: string, index: number): void {
   const pending = states.get(sessionId)?.pending
   if (pending === undefined) return
-  freezeStore.set(sessionId, { frozen: true, pending: pending.filter((_, i) => i !== index) })
+  writePending(sessionId, pending.filter((_, i) => i !== index))
 }
 
 /** Move one detached queued message to a new position (reorder while frozen). */
@@ -108,7 +125,7 @@ export function movePending(sessionId: string, from: number, to: number): void {
   const [moved] = next.splice(from, 1)
   if (moved === undefined) return
   next.splice(to, 0, moved)
-  freezeStore.set(sessionId, { frozen: true, pending: next })
+  writePending(sessionId, next)
 }
 
 function emit(): void {

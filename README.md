@@ -129,6 +129,16 @@
 - **引擎实现**：冻结 = 逐条 `updateQueue(remove)` 分离队列（含档位的副本存于插件 store，按 sessionId 隔离），当前轮次完成后 driver 因无 pending 自然停止；冻结期间对队列的修改（文本/顺序/档位）实时写回 store；恢复 = 先 `await sessionGuard.resume(sessionId)`（被打断回合的自然下一步先发生），再逐条 `send(text)` 重新提交并唤醒 driver（红色档位的条目先 `cancel()` 再发送）；
 - 注意：含非文本内容（图片）的排队消息无法重发，冻结时会随队列释放（不会恢复）。
 
+### 已知宿主缺陷：撤回后队列滞留（无自动恢复）
+
+宿主 `dsh-agent-loop` 在**回合被 abort** 时走的是 `turn()` 的 throw 分支，到不了末尾 `hasPending` 的续转返回；而 `kick()` 收尾唯一再武装路径 `wakeRequested` 在「正常运行期排队」时从未置位。于是这条路径会断：
+
+> 发消息 1 → 回合进行中发消息 2（进绿档排队）→ **撤回消息 1** → agent 转 idle，消息 2 永远不再派发。
+
+三档排层按钮全部要求 `running`，此时整套 UI 无恢复入口。**手动恢复**：连点「冻结会话」两下（冻结 → 恢复）—— 冻结逐行 `remove` 不要求 running，恢复按 FIFO `send` 重投，idle 态 `send` 立即唤醒新回合，续转链接管排空。
+
+本插件**不**做「idle + 队列非空」的自动冻结/自动重投：这个判据在宿主正常排空的瞬间也成立（`running` 由投影驱动，存在跨帧空窗），误判的代价是打断一次正常续转，比它要解决的问题更糟。根治需要宿主在 abort 收尾保留续转语义（`kick()` 收尾条件放宽为 `wasAborted || wakeRequested`），已随 issue #5 转报上游。
+
 ### 借助 dsh-session-guard 实现会话级锁定
 
 冻结按钮触发时经 **sessionGuard 桥**（`src/client/session-guard-bridge.ts` → `POST /session-guard/rpc { action: stopNextTurn|resume, sessionId }`）透传服务端做**会话级锁定**；同时在前端 raise composer block（`conversation.blocks.set`），输入框变 inert、回车不再漏进对话：

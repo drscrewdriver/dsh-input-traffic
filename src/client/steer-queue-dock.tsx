@@ -42,16 +42,29 @@ import css from './steer-queue-dock.module.css'
 /**
  * Suppress the OFFICIAL queue dock entirely: our shadowing entry owns the
  * `queue` cell, so the official dock is only ever mounted as a crash fallback
- * — and its per-row 插话发送 duplicates our yellow tier. Hide the whole
- * container by its css-module class (the `_7yHdaG` hash is baked into the
- * host build and stable across restarts), plus the aria-label match as a
- * second net in case the host rehashes.
+ * — and its per-row 插话发送 duplicates our yellow tier.
+ *
+ * Two rules, deliberately:
+ *  1. `[data-queue-dock]` — the host's own attribute on the dock's root
+ *     (`QueueDock.tsx`: `jsx('div', { className: css.dock, 'data-queue-dock': '' })`).
+ *     Hash-free and locale-free, so it survives a host rebuild. This is the rule
+ *     that has to work.
+ *  2. `[class*="_7yHdaG_dock"]` — the old css-module hash. Kept only for hosts
+ *     that predate the attribute; on the current build it matches nothing
+ *     (measured: 0 occurrences of `_7yHdaG` in the 0.2.2-rc.3 `app.asar`, which
+ *     rehashed the module to `F07MqG`). That is exactly the defect issue #5
+ *     reported — the single-rule version was dead on arrival here, so the
+ *     official dock was never hidden and its per-row steer duplicated ours.
+ *
+ * Class-based matching stays narrow on purpose: `[class*="_dock"]` alone would
+ * also catch `GRgSLq_dock` / `Gc24Bq_dock` / `n75qPq_dock` (other host docks).
+ * The aria-label net the old comment promised is NOT usable — the official steer
+ * button and our own yellow tier render the same 插话发送 label, so an attribute
+ * rule on it would hide our own button too.
  */
 const HIDE_OFFICIAL_QUEUE_CSS =
-  // Class-based only: the official steer button and OUR yellow tier share the
-  // same rendered aria-label (插话发送) — an attribute rule would hide our
-  // own button too.
-  '[class*="_7yHdaG_dock"]{display:none!important}'
+  '[data-queue-dock]{display:none!important}'
+  + '[class*="_7yHdaG_dock"]{display:none!important}'
 if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css="dsh-input-traffic/hide-official-steer"]') === null) {
   const tag = document.createElement('style')
   tag.dataset.plugin = 'dsh-input-traffic'
