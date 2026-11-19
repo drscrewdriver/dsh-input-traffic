@@ -56,6 +56,8 @@ const MATRIX = path.join(RESULTS, 'matrix')
 const TGZ_CACHE = path.join(RESULTS, 'host-tgz')
 const WIN32 = process.platform === 'win32'
 const PNPM = WIN32 ? 'pnpm.cmd' : 'pnpm'
+/** 只用于"带包名参数的 pack"：pnpm pack 不接受 `<pkg>@<version>`，只有 npm 接受。 */
+const NPM = WIN32 ? 'npm.cmd' : 'npm'
 const INSTALL_ARGS = ['install', '--ignore-scripts', '--prefer-offline', '--loglevel=error']
 const REGISTRY = '--registry=https://registry.npmjs.org/'
 
@@ -108,7 +110,21 @@ async function ensureTgz(version) {
   const dest = path.join(TGZ_CACHE, `deepseek-ai-dsh-${version}.tgz`)
   if (existsSync(dest)) return dest
   console.log(`       pack host ${version}`)
-  await run(TGZ_CACHE, PNPM, ['pack', `@deepseek-ai/dsh@${version}`, '--loglevel=error'], `pnpm pack host ${version}`)
+  // 必须是 npm 而非 pnpm：`pnpm pack` **不接受包名参数**（只能打包当前目录），
+  // `pnpm pack @scope/pkg@1.2.3` 直接是参数解析错误——
+  //   error: unexpected argument '@deepseek-ai/dsh@0.2.1-rc.1' found / exit 2
+  // 历史 15 格之所以"绿"，是因为它们早就在 host-tgz/ 里有缓存（existsSync 提前
+  // return），打包这一步从未真正执行；缓存断在哪一格，矩阵就从哪一格开始 ERROR。
+  // npm pack 支持 `<pkg>@<version>` 且不读 workspace（本仓 pnpm-workspace.yaml 只有
+  // minimumReleaseAgeExclude，没有 packages 字段）。registry 必须显式钉 npmjs：
+  // ~/.npmrc 默认指向 npmmirror，镜像对新 rc 有同步延迟。
+  await run(
+    TGZ_CACHE,
+    NPM,
+    ['pack', `@deepseek-ai/dsh@${version}`, `--pack-destination=${TGZ_CACHE}`, REGISTRY, '--loglevel=error'],
+    `npm pack host ${version}`,
+  )
+  if (!existsSync(dest)) throw new Error(`npm pack 未产出 ${path.basename(dest)}（检查打包输出文件名）`)
   return dest
 }
 
@@ -278,7 +294,10 @@ for (const version of versions) {
     console.log(`${checks.verdict.toUpperCase()}${checks.notes.length ? `（${checks.notes.join('；')}）` : ''}`)
     results.push(checks)
   } catch (error) {
-    console.log('ERROR')
+    // 把失败原因的第一行带出来：此前只打 'ERROR'，10 格连挂却看不出是打包、
+    // 安装、add 还是 boot 挂的（真因写在 results.json 里但没人会去翻）。
+    const reason = String(error.message ?? error).split('\n')[0].slice(0, 160)
+    console.log(`ERROR（${reason}）`)
     const checks = { version, verdict: 'error', green: false, error: String(error.message ?? error) }
     results.push(checks)
     await mkdir(path.join(MATRIX, version), { recursive: true })
