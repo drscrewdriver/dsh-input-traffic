@@ -38,11 +38,29 @@ export const supportedHosts = Object.freeze([
   '0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.1-rc.5',
   // 0.2.2 line
   '0.2.2-rc.1',
+  // 2026-11-19 补票 rc.2..rc.5：四格 14 列探针与 rc.1 同形（gate blob 2e4ca5736a77
+  // 自 alpha.2 未变、capability-seams 810ff60c1509、persistence-catalog
+  // 33d9aa439563、slot-catalog 617b47fe2f29、SESSION_FORMAT_VERSION=4）；
+  // rc.3→rc.4 的 packages/client 纯版本号，rc.5 只动搜索页文案与 AUTO 项。
+  '0.2.2-rc.2', '0.2.2-rc.3', '0.2.2-rc.4', '0.2.2-rc.5',
 ])
 
-/** peerDependencies / engines.dsh 共用的枚举串（精确枚举无暗坑，INDEX §B）。 */
-export const peerRange = `>=${supportedHosts[0]} <0.3.0-0`
-/** 已实测宿主细胞：仅供 README 展示 / 矩阵脚本，不再下发给 peer。 */
+/**
+ * peerDependencies 用的**逐 rc 枚举串**（INDEX §B）。2026-11-16 修正：这里曾是
+ * 有界区间 `>=… <0.3.0-0`，而 node-semver 只让预发布版命中「同元组边界」的区间，
+ * 中间的每个 rc 都被排除 → pnpm/npm 解析不到 peer，装不上
+ * （ERR_PNPM_OUTDATED_LOCKFILE / ETARGET / EUSAGE）。枚举才是 resolver 能吃的形状。
+ */
+export const peerRange = supportedHosts.join(' || ')
+
+/**
+ * engines.dsh 用的**有界区间**：下限＝本枚举起点（不硬编码，防「下限写贵了
+ * 静默丢老线」），上限 `<0.3.0-0`（`-0` 是关键：裸 `<0.3.0` 在
+ * includePrerelease 下仍放行 0.3.0-rc.*）。宿主侧判定带 includePrerelease，
+ * 区间口径安全。
+ */
+export const enginesRange = `>=${supportedHosts[0]} <0.3.0-0`
+/** 已实测宿主细胞：仅供 README 展示 / 矩阵脚本。 */
 export const hostCells = supportedHosts.join(' || ')
 
 /** 本地开发与矩阵默认宿主（devDependencies 若引入宿主包一律钉这里）。 */

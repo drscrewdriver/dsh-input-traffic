@@ -18,7 +18,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import assert from 'node:assert/strict'
-import { supportedHosts, peerRange, developmentHost, hostPeerPackages } from './hosts.mjs'
+import { supportedHosts, peerRange, enginesRange, developmentHost, hostPeerPackages } from './hosts.mjs'
 
 const ROOT = new URL('..', import.meta.url)
 const write = process.argv.includes('--write')
@@ -36,7 +36,7 @@ const pkgUrl = new URL('package.json', ROOT)
 const pkgOriginal = await read('package.json')
 const pkg = JSON.parse(pkgOriginal)
 pkg.engines ??= {}
-pkg.engines.dsh = peerRange
+pkg.engines.dsh = enginesRange
 pkg.peerDependencies ??= {}
 for (const name of hostPeerPackages) {
   // 必需 peer：缺失或版本不在枚举内都在 `plugin add` 时即拒（ERESOLVE），
@@ -55,7 +55,7 @@ const pluginJsonUrl = new URL('dsh.plugin.json', ROOT)
 const pluginOriginal = await read('dsh.plugin.json')
 const manifest = JSON.parse(pluginOriginal)
 manifest.engines ??= {}
-manifest.engines.dsh = peerRange
+manifest.engines.dsh = enginesRange
 manifest.version = pkg.version // version 以 package.json 为准，manifest 只镜像
 const manifestExpected = JSON.stringify(manifest, null, 2) + '\n'
 
