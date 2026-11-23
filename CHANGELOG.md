@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.7.18 (2026-11-23)
+
+**兑现「冻结追加」这个从 0.2.10-beta.2 起就写在按钮上的承诺。** 那次提交（`22e8fa8`）把标签改成「冻结追加 / Freeze & append」，commit message 里明写 *Labels only, behaviour unchanged* —— 能力一直没落地。本轮补上，并按用户拍板把口径定为**「冻结入队 / 恢复入队」**（「追加」是 append 的直译，中文不自然）。
+
+### 新增：冻结期可入队新指令（issue #8）
+
+冻结的真实机制是**摘走 + 清空**，不是暂停：`freeze()` 逐条 `updateQueue(id, {kind:'remove'})` 把宿主两个档位清空，driver 见 `inbox.hasPending === false` 回 idle。所以冻结期宿主 `next-turn` 恒为 `[]`，composer 又被 `setComposerBlock` 锁死——两条入队路径都是堵死的。
+
+补的是第三条：dock 冻结列表下方一个插件自有 `<input>`，回车/点按钮走 `pushPending(sid, text, 'queue')` 写进影子队列。宿主侧一个字节都不动，composer 照旧 inert。
+
+- `pushPending` 其实**早已存在**（随 0.2.x「冻结与队列解耦」一起建，`tests/freeze-store.client.spec.tsx` 也一直有单测），但**全仓零调用点**——esbuild 一直把它摇树掉。这也正是 issue 作者说「dist 里 `pushPending` 被 tree-shake，只能直接操作 store」的成因。接上 UI 后自然解决（产物核验：`lib/client.js` 里 `pushPending` 命中数 0 → 2）。
+- 落 `tier: 'queue'`：恢复时与冻结前就在绿档的行走同一条 `send()` 路径，行为完全一致。要「抢在队列前面」用既有的 `movePending` 上移，入队本身不承担排序。
+- 渲染条件用 `frozen` 而非 `frozen && pending.length > 0`：冻结空队列时 store 保留 `{frozen:true, pending:[]}`，那恰恰是最需要输入框的状态。
+- IME 守卫：`!event.nativeEvent.isComposing`，否则中文输入法选词回车会提交半截拼音（与 dock 内既有编辑框同款）。
+
+### 修复：系统 notice 被当成用户插话恢复（D1）
+
+`freeze()` 摘 `next-step` 时用的是**全量**，而 dock 渲染时用 `isHumanSteer` 过滤。宿主往 `next-step` 里混了两类东西——人工插话（`source.kind === 'user'`）和服务/插件注入的上下文（`user-approval` / `policy` / `time-context` / perm-gate 的 block opinion）。
+
+后果链：冻结把 host notice 抄进 `pending` 标 `safe_point` → 恢复时 `sendSteer()` 把它当用户插话重新投递，一条系统提示被伪装成人打的字。
+
+- `freeze-button.tsx`：`steeredIds` 与 `rows` 两处都加 `.filter(isHumanSteer)`。`isHumanSteer` 从 dock 导出，且本文件**本就**从 dock 导入 `textOf`，零新增依赖方向。
+- 副作用（已知并接受）：这类 notice 冻结期丢弃。transient 的 `time-context`/`policy` 丢弃合理；`user-approval` 也不保留到恢复后——冻结期本来也处理不了审批。
+
+### 文案
+
+`steer.freeze` / `steer.resume`：冻结追加 → **冻结入队** / 恢复追加 → **恢复入队**；`steer.frozenInput` 由「输入已暂停，恢复后继续」改为「主输入框已暂停，可在下方入队」；新增 `steer.frozenAdd` + `steer.frozenAdd.placeholder`。10 语全量（`en` 起 9 个字典是 `Record<keyof typeof zh, string>`，漏 key 直接编译失败）。
+
+### 门禁
+
+typecheck 干净；vitest 9 文件 103 passed（新增 7 条：store 2 + dock 5 + freeze-button 2 净增）；lint 零告警；build 通过，产物核验 `pushPending` 与 `frozenAdd` 均已进 bundle。
+
 ## 0.7.16 (2026-11-18)
 
 issue #5 的三个次生缺陷里，两个在源码上成立且已修；第三个（滞留态无恢复入口）是宿主侧派发链断裂，本轮不碰，见下方说明。

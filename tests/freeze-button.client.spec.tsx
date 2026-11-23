@@ -187,8 +187,50 @@ describe('FreezeButton', () => {
     })
   })
 
-  it('resume re-steers safe_point (yellow) entries into the next step', async () => {
-    const { cancel, send, sendSteer } = mount(snapshot([]))
+  it('freeze drops injected next-step notices (non-human source) instead of carrying them', async () => {
+    // The host merges two things into next-step: human steering and context
+    // pushed by a service (user-approval / policy / time-context, and third
+    // party notes such as perm-gate's block opinion). Only the former is ours
+    // to carry — a notice replayed through sendSteer() on resume would look
+    // like the person typed a system prompt.
+    const rows = [
+      { id: 'm1', messageId: 'm1', placement: 'queued' as const, preview: 'a', text: 'a', content: [] },
+      {
+        id: 's1', messageId: 's1', placement: 'steering' as const, preview: 'notice', text: 'notice', content: [],
+        source: { kind: 'perm-gate' },
+      },
+    ]
+    const { updateQueue } = mount(snapshot(rows))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    // Only the human row lands in the detached queue.
+    expect(freezeStore.getSnapshot('s1')).toEqual({
+      frozen: true,
+      pending: [{ text: 'a', tier: 'queue' }],
+    })
+    // The notice is left alone — never claimed, never re-sent.
+    expect(updateQueue).not.toHaveBeenCalledWith('s1', { kind: 'remove' })
+  })
+
+  it('freeze keeps a human steer (source.kind = user) as a safe_point plan', async () => {
+    const rows = [
+      {
+        id: 's2', messageId: 's2', placement: 'steering' as const, preview: '插话', text: '插话', content: [],
+        source: { kind: 'user' },
+      },
+    ]
+    mount(snapshot(rows))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'steer.freeze' }))
+    })
+    expect(freezeStore.getSnapshot('s1')).toEqual({
+      frozen: true,
+      pending: [{ text: '插话', tier: 'safe_point' }],
+    })
+  })
+
+  it('resume re-steers safe_point (yellow) entries into the next step', async () => {    const { cancel, send, sendSteer } = mount(snapshot([]))
     await act(async () => {
       freezeStore.set('s1', { frozen: true, pending: [
         { text: '急事', tier: 'force' },

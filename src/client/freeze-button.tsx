@@ -20,7 +20,7 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { freezeStore } from './freeze-store.ts'
 import type { FrozenTier } from './freeze-store.ts'
-import { textOf, type SteerQueueDockInjected } from './steer-queue-dock.tsx'
+import { textOf, isHumanSteer, type SteerQueueDockInjected } from './steer-queue-dock.tsx'
 import { sessionGuardResume, sessionGuardStopNextTurn } from './session-guard-bridge.ts'
 import css from './freeze-button.module.css'
 
@@ -55,11 +55,19 @@ export function FreezeButton({ useProjection, updateQueue, cancel, send, sendSte
     // Detach every pending input row — queued (next-turn) and already-steered
     // (next-step) alike — so nothing stays in the live queue while frozen.
     // Steered rows keep their next intent as a safe_point plan for resume.
-    const steeredIds = new Set((inbox?.['next-step'] ?? []).map(row => row.id))
+    //
+    // `next-step` mixes human steering with injected context (host notices,
+    // third-party block opinions). Only the human rows are ours to carry: the
+    // dock already filters them out of the yellow band with `isHumanSteer`, and
+    // without the same filter here a host notice would be preserved as a
+    // safe_point entry and then re-delivered through `sendSteer()` on resume —
+    // a system prompt replayed as if the person had typed it.
+    const humanSteering = (inbox?.['next-step'] ?? []).filter(isHumanSteer)
+    const steeredIds = new Set(humanSteering.map(row => row.id))
     // Store order first (next-turn), then the steered band — matching the
     // pre-projection queue ordering the resume path replays. Wire rows carry
     // no `.text`; derive it from the content blocks like the dock does.
-    const rows = [...(inbox?.['next-turn'] ?? []), ...(inbox?.['next-step'] ?? [])].map(row => ({
+    const rows = [...(inbox?.['next-turn'] ?? []), ...humanSteering].map(row => ({
       ...row,
       text: textOf(row.content) ?? row.text ?? null,
     }))

@@ -424,8 +424,84 @@ describe('SteerQueueDock', () => {
     }
   })
 
-  it('expands multiple rows by default (a multi-row queue never hides itself)', () => {
-    const { view } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
+  it('frozen session renders the enqueue row, unfrozen does not (issue #8)', () => {
+    freezeStore.set('s1', { frozen: true, pending: [{ text: '甲', tier: 'queue' }] })
+    try {
+      mount(snapshot([]))
+      expect(screen.getByLabelText('steer.frozenAdd.placeholder')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'steer.frozenAdd' })).toBeTruthy()
+    } finally {
+      resetFreezeStore()
+    }
+    // Not frozen → no enqueue row at all.
+    mount(snapshot([queueRow('m1', 'a')]))
+    expect(screen.queryByLabelText('steer.frozenAdd.placeholder')).toBeNull()
+  })
+
+  it('enqueue row renders even when the frozen queue is empty', () => {
+    // Freezing an empty queue leaves `{frozen:true, pending:[]}` in the store;
+    // that is precisely when a person needs somewhere to type.
+    freezeStore.set('s1', { frozen: true, pending: [] })
+    try {
+      const { view } = mount(snapshot([]))
+      expect(screen.getByLabelText('steer.frozenAdd.placeholder')).toBeTruthy()
+      // The frozen LIST stays hidden (it has no rows), the input does not.
+      expect(view.container.querySelector('[data-testid="frozen-list"]')).toBeNull()
+    } finally {
+      resetFreezeStore()
+    }
+  })
+
+  it('Enter enqueues the typed instruction onto the frozen queue tail', () => {
+    freezeStore.set('s1', { frozen: true, pending: [{ text: '甲', tier: 'queue' }] })
+    try {
+      mount(snapshot([]))
+      const input = screen.getByLabelText('steer.frozenAdd.placeholder') as HTMLInputElement
+      fireEvent.change(input, { target: { value: '新指令' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(freezeStore.getSnapshot('s1').pending).toEqual([
+        { text: '甲', tier: 'queue' },
+        { text: '新指令', tier: 'queue' },
+      ])
+      // The draft clears so the next instruction can be typed straight away.
+      expect(input.value).toBe('')
+    } finally {
+      resetFreezeStore()
+    }
+  })
+
+  it('an IME-confirming Enter does not enqueue', () => {
+    // A candidate-confirm Enter carries isComposing; submitting on it would
+    // send half a pinyin buffer.
+    freezeStore.set('s1', { frozen: true, pending: [] })
+    try {
+      mount(snapshot([]))
+      const input = screen.getByLabelText('steer.frozenAdd.placeholder') as HTMLInputElement
+      fireEvent.change(input, { target: { value: '拼音' } })
+      fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+      expect(freezeStore.getSnapshot('s1').pending).toEqual([])
+    } finally {
+      resetFreezeStore()
+    }
+  })
+
+  it('blank input does not enqueue and the add button stays disabled', () => {
+    freezeStore.set('s1', { frozen: true, pending: [] })
+    try {
+      mount(snapshot([]))
+      const input = screen.getByLabelText('steer.frozenAdd.placeholder') as HTMLInputElement
+      const addButton = screen.getByRole('button', { name: 'steer.frozenAdd' })
+      expect(addButton.hasAttribute('disabled')).toBe(true)
+      fireEvent.change(input, { target: { value: '   ' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(freezeStore.getSnapshot('s1').pending).toEqual([])
+      expect(addButton.hasAttribute('disabled')).toBe(true)
+    } finally {
+      resetFreezeStore()
+    }
+  })
+
+  it('expands multiple rows by default (a multi-row queue never hides itself)', () => {    const { view } = mount(snapshot([queueRow('m1', 'a'), queueRow('m2', 'b')]))
     // The count header still shows the queue length, but every row stays visible.
     expect(screen.getByText('2')).toBeTruthy()
     expect(view.container.querySelector('ul[hidden]')).toBeNull()
@@ -519,9 +595,11 @@ describe('queue editing (dsh-queue-plus inspired)', () => {
 
   it('frozen queue rows can be edited in place', () => {
     freezeStore.set('s1', { frozen: true, pending: [{ text: '原文', tier: 'queue' }] })
-    mount(snapshot([], { running: false }))
+    const { view } = mount(snapshot([], { running: false }))
     fireEvent.click(screen.getByRole('button', { name: 'queue.edit' }))
-    const editor = screen.getByRole('textbox') as HTMLTextAreaElement
+    // Target the in-place editor by tag: the frozen state now also renders the
+    // enqueue <input> (issue #8), so `getByRole('textbox')` is ambiguous.
+    const editor = view.container.querySelector('textarea') as HTMLTextAreaElement
     fireEvent.change(editor, { target: { value: '改后' } })
     fireEvent.click(screen.getByRole('button', { name: 'queue.save' }))
     expect(freezeStore.getSnapshot('s1').pending).toEqual([{ text: '改后', tier: 'queue' }])

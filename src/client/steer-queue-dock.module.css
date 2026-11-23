@@ -167,6 +167,34 @@
   color: var(--dsw-alias-label-tertiary, #9ca3af);
 }
 
+/* Frozen-queue enqueue row (issue #8): while frozen the host queue is empty and
+   the composer is blocked, so this plugin-owned input is the only way to keep
+   accumulating instructions. Sits directly under the frozen list. */
+.frozenAdd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 6px;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.06));
+}
+
+.frozenAddInput {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.08));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+.frozenAddInput:focus {
+  outline: none;
+  border-color: var(--dsw-alias-interactive-border-focus, #3b82f6);
+}
+
 .clear:hover:not(:disabled) {
   border-color: var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
   background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.04));

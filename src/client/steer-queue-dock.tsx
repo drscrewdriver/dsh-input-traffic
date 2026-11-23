@@ -36,7 +36,7 @@ import {
   IconCheckOutlineMedium, IconChevronDownOutlineMedium, IconChevronUpOutlineMedium, IconCloseOutlineMedium,
   IconEditOutlineMedium, IconQueueOutlineMedium, IconTrashOutlineMedium, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { freezeStore, setTierAt, updatePendingAt, removePendingAt, movePending } from './freeze-store.ts'
+import { freezeStore, pushPending, setTierAt, updatePendingAt, removePendingAt, movePending } from './freeze-store.ts'
 import css from './steer-queue-dock.module.css'
 
 /**
@@ -245,6 +245,10 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   const listId = useId()
   // The edit textarea; grown to its content on entry and on every input.
   const editorRef = useRef<HTMLTextAreaElement>(null)
+  // Draft for the frozen-queue enqueue row (issue #8). Component-local on
+  // purpose: it is only ever committed by `appendFrozen`, which writes into the
+  // shared freeze store.
+  const [frozenDraft, setFrozenDraft] = useState('')
 
   useEffect(() => {
     // No auto-collapse when the queue drains: the collapse state belongs to
@@ -536,6 +540,23 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
     setEditing(null)
   }
 
+  /**
+   * Enqueue one new instruction onto the tail of the detached (frozen) queue.
+   *
+   * Freezing empties BOTH host bands and blocks the composer, so this
+   * plugin-owned input is the only way to keep accumulating instructions while
+   * paused (issue #8). The entry lands as `tier: 'queue'` — resume then replays
+   * it through the same `send()` path a pre-freeze green row takes, so the two
+   * are indistinguishable afterwards. Appending at the tail is deliberate:
+   * "jump ahead of the rest" is the existing `movePending` affordance.
+   */
+  const appendFrozen = (): void => {
+    const text = frozenDraft.trim()
+    if (text === '') return
+    pushPending(sid, text, 'queue')
+    setFrozenDraft('')
+  }
+
   const clearAll = async (): Promise<void> => {
     setClearing(true)
     // Cancel the current run and clear every pending row (queued and
@@ -788,6 +809,42 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
               )
             })}
           </ul>
+        )}
+        {/* Enqueue row (issue #8). Gated on `frozen` alone — NOT on
+            `frozenPending.length > 0`: freezing an empty queue keeps
+            `{frozen:true, pending:[]}` in the store, and that is exactly the
+            state where a person most needs somewhere to type. */}
+        {frozen && (
+          <div className={css.frozenAdd}>
+            <input
+              type="text"
+              className={css.frozenAddInput}
+              value={frozenDraft}
+              placeholder={t('steer.frozenAdd.placeholder')}
+              aria-label={t('steer.frozenAdd.placeholder')}
+              onChange={(event) => { setFrozenDraft(event.currentTarget.value) }}
+              onKeyDown={(event) => {
+                // An IME candidate-confirm Enter carries `isComposing`; sending
+                // on it would submit half a pinyin buffer (same guard as the
+                // in-place editors above).
+                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                  event.preventDefault()
+                  appendFrozen()
+                }
+              }}
+            />
+            <Tooltip label={t('steer.frozenAdd')} side="bottom" delayMs={500}>
+              <button
+                type="button"
+                className={css.action}
+                aria-label={t('steer.frozenAdd')}
+                disabled={frozenDraft.trim() === ''}
+                onClick={appendFrozen}
+              >
+                <IconCheckOutlineMedium size={14} />
+              </button>
+            </Tooltip>
+          </div>
         )}
         <ul id={listId} className={css.list} hidden={!listVisible}>
           {listVisible && queue.map((row, index) => (

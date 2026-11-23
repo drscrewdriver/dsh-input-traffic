@@ -85,4 +85,34 @@ describe('其余 mutator 不得篡改显式冻结态', () => {
     expect(snap.pending).toHaveLength(1)
     expect(snap.frozen).toBe(false)
   })
+
+  it('pushPending 入队到末尾，且不动既有条目的档位（issue #8）', () => {
+    // 冻结期入队只允许落在队尾：插队是既有的 movePending 上移动作，
+    // 入队本身不承担排序，否则「新增」会顺手改写用户已规划好的档位。
+    freezeStore.set('s1', {
+      frozen: true,
+      pending: [
+        { text: '甲', tier: 'queue' },
+        { text: '乙', tier: 'safe_point' },
+        { text: '丙', tier: 'force' },
+      ],
+    })
+    pushPending('s1', '新指令', 'queue')
+    const snap = freezeStore.getSnapshot('s1')
+    expect(snap.frozen).toBe(true)
+    expect(snap.pending).toEqual([
+      { text: '甲', tier: 'queue' },
+      { text: '乙', tier: 'safe_point' },
+      { text: '丙', tier: 'force' },
+      { text: '新指令', tier: 'queue' },
+    ])
+  })
+
+  it('pushPending 可连续入队多条', () => {
+    freezeStore.set('s1', { frozen: true, pending: [] })
+    pushPending('s1', '一', 'queue')
+    pushPending('s1', '二', 'queue')
+    pushPending('s1', '三', 'queue')
+    expect(freezeStore.getSnapshot('s1').pending.map((e) => e.text)).toEqual(['一', '二', '三'])
+  })
 })
