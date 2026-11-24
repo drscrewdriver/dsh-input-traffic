@@ -166,6 +166,44 @@ describe('SteerQueueDock', () => {
     expect(screen.getByText('human steer')).toBeTruthy()
   })
 
+  // Issue #9: after a rewind + resend the same message stood in the transcript
+  // as the host's own submission echo AND in this waiting area as an inbox row,
+  // so the person could not tell whether it had been sent. The host's chat view
+  // paints every non-queued echo itself; the dock must not repeat those rows.
+  describe('submission echoes', () => {
+    const echoedRow = (id: string, text: string, rpcId: string, placement: 'queued' | 'steering' = 'queued') =>
+      ({ id, messageId: id, placement, preview: text, text, content: [], source: { kind: 'user', rpcId } }) as unknown as ConversationSnapshot['queue'][number]
+    const echo = (requestId: string, placement: 'transcript' | 'queued' | 'steering') =>
+      ({ requestId, placement, time: 1, text: '' })
+    const withEchoes = (echoes: ReturnType<typeof echo>[]) =>
+      ({ pendingSubmissions: echoes }) as unknown as Partial<ConversationSnapshot>
+
+    it('hides the queued row whose echo the conversation body already paints', () => {
+      const { view } = mount(snapshot([echoedRow('i1', '111', 'r1')], withEchoes([echo('r1', 'transcript')])))
+      expect(view.container.textContent).not.toContain('111')
+    })
+
+    it('hides the steering row whose echo the conversation body already paints', () => {
+      const { view } = mount(snapshot([echoedRow('i2', 'steered', 'r2', 'steering')], withEchoes([echo('r2', 'steering')])))
+      expect(view.container.textContent).not.toContain('steered')
+    })
+
+    it('keeps the row for a merely queued echo — the dock is that echo\'s home', () => {
+      const { view } = mount(snapshot([echoedRow('i3', 'still queued', 'r3')], withEchoes([echo('r3', 'queued')])))
+      expect(view.container.textContent).toContain('still queued')
+    })
+
+    it('keeps rows belonging to some other submission', () => {
+      const { view } = mount(snapshot([echoedRow('i4', 'unrelated row', 'r4')], withEchoes([echo('r9', 'transcript')])))
+      expect(view.container.textContent).toContain('unrelated row')
+    })
+
+    it('keeps rows on a host whose snapshot carries no echoes', () => {
+      const { view } = mount(snapshot([echoedRow('i5', 'legacy host row', 'r5')]))
+      expect(view.container.textContent).toContain('legacy host row')
+    })
+  })
+
   it('green on a steering row revokes it back to later (remove + resend)', async () => {
     const steeringRow = { id: 's1', messageId: 's1', placement: 'steering' as const, preview: 'steering now', text: 'steering now', content: [] }
     const { updateQueue, send } = mount(snapshot([steeringRow]))

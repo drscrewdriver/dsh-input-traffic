@@ -44,6 +44,19 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
   /**
+   * One local prompt-submission echo: the host paints it into the conversation
+   * body (or this dock, for `queued`) until its durable event arrives. A
+   * `transcript`/`steering` echo is the same message the `inbox` projection may
+   * still list, so both renderers have to agree on which one owns the row.
+   */
+  export interface PendingSubmission {
+    /** The prompt RPC identity; inbox rows echo it as `source.rpcId`. */
+    readonly requestId: string
+    /** Surface the host paints the echo on; `queued` echoes belong to the dock. */
+    readonly placement: 'transcript' | 'queued' | 'steering'
+  }
+
+  /**
    * Immutable Session lifecycle and control snapshot, consumed by the session
    * standard kit. Only the members this plugin reads are declared. Queue rows
    * are NOT on the snapshot — released hosts expose them only through the
@@ -51,6 +64,13 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
    */
   export interface SessionSnapshot {
     readonly sessionId: SessionId
+    /**
+     * Local submission echoes still awaiting their durable counterpart.
+     * Optional on purpose: the 0.1.0 / 0.1.1 host lines still served this
+     * snapshot from `dsh-client-runtime`, which this plugin cannot assert a
+     * field for — readers treat absence as "no echoes" rather than crashing.
+     */
+    readonly pendingSubmissions?: readonly PendingSubmission[]
     readonly running: boolean
     readonly subagent: {
       readonly address: { readonly mode: string }

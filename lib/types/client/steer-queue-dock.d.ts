@@ -96,6 +96,33 @@ export declare function textOf(content: readonly {
     readonly text?: string;
 }[] | undefined): string | null;
 /**
+ * Whether one inbox row is already painted in the conversation body as the
+ * host's own submission echo.
+ *
+ * The host merges one message into two renderers: the chat view paints every
+ * local submission echo whose placement is not `queued`, while this dock reads
+ * the `inbox` projection. During the window between a submission and its
+ * observation, a `transcript`/`steering` echo and its inbox row describe the
+ * same message, and listing both made a rewind + resend look sent and queued at
+ * once (issue #9). The official `QueueDock` resolves this the same way, by
+ * `source.rpcId`.
+ *
+ * `queued` echoes are deliberately NOT matched: the dock is their only home,
+ * and the host admits that row into `next-turn` before retiring the echo.
+ * @param row - one inbox row from either band.
+ * @param echoed - requestIds of the echoes the conversation body is painting.
+ * @returns true when the conversation body owns this message, so the dock must
+ * not draw it a second time.
+ */
+export declare function isEchoedInChat(row: {
+    readonly source?: {
+        readonly kind?: string;
+        readonly rpcId?: string;
+    };
+}, echoed: {
+    has(id: string): boolean;
+}): boolean;
+/**
  * Queue strip with three-tier planning: one item renders directly; multiple
  * items default to a collapsible count header; an empty queue renders nothing.
  */

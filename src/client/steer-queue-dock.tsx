@@ -28,6 +28,8 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+// Type-only: one local submission echo as the session snapshot declares it.
+import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: the conversation slot/contract declarations (module augmentation
 // for the SlotMap and the session standard kit). No value import crosses the
 // plugin boundary.
@@ -192,6 +194,37 @@ export function textOf(content: readonly { readonly type: string; readonly text?
 }
 
 /**
+ * Whether one inbox row is already painted in the conversation body as the
+ * host's own submission echo.
+ *
+ * The host merges one message into two renderers: the chat view paints every
+ * local submission echo whose placement is not `queued`, while this dock reads
+ * the `inbox` projection. During the window between a submission and its
+ * observation, a `transcript`/`steering` echo and its inbox row describe the
+ * same message, and listing both made a rewind + resend look sent and queued at
+ * once (issue #9). The official `QueueDock` resolves this the same way, by
+ * `source.rpcId`.
+ *
+ * `queued` echoes are deliberately NOT matched: the dock is their only home,
+ * and the host admits that row into `next-turn` before retiring the echo.
+ * @param row - one inbox row from either band.
+ * @param echoed - requestIds of the echoes the conversation body is painting.
+ * @returns true when the conversation body owns this message, so the dock must
+ * not draw it a second time.
+ */
+export function isEchoedInChat(
+  row: { readonly source?: { readonly kind?: string; readonly rpcId?: string } },
+  echoed: { has(id: string): boolean },
+): boolean {
+  const source = row.source
+  if (source?.kind !== 'user' || source.rpcId === undefined) return false
+  return echoed.has(source.rpcId)
+}
+
+/** Stable empty echo list: hosts without `pendingSubmissions` must not churn a memo. */
+const NO_ECHOES: readonly PendingSubmission[] = []
+
+/**
  * Queue strip with three-tier planning: one item renders directly; multiple
  * items default to a collapsible count header; an empty queue renders nothing.
  */
@@ -200,12 +233,21 @@ export function SteerQueueDock({ sessionId, useSession, useProjection, input, up
   // is the plain queue (green tier), `next-step` the steered band (yellow).
   // The session store never carried a `queue` field on released hosts.
   const inbox = useProjection('inbox')
+  // Echoes the conversation body may already paint; absent on the host lines
+  // that served this snapshot from the retired runtime package. `queued`
+  // echoes are skipped: this dock is their only home.
+  const submissionEchoes = useSession(s => s.pendingSubmissions) ?? NO_ECHOES
+  const echoedInChat = useMemo(() => {
+    const echoed = new Set<string>()
+    for (const echo of submissionEchoes) if (echo.placement !== 'queued') echoed.add(echo.requestId)
+    return echoed
+  }, [submissionEchoes])
   // Wire rows carry no `.text`; derive it from the content blocks, falling
   // back to a declared text for fixture/local rows.
-  const queue = useMemo(() => (inbox?.['next-turn'] ?? []).map(row => ({ ...row, text: textOf(row.content) ?? row.text ?? null })), [inbox])
+  const queue = useMemo(() => (inbox?.['next-turn'] ?? []).filter(row => !isEchoedInChat(row, echoedInChat)).map(row => ({ ...row, text: textOf(row.content) ?? row.text ?? null })), [inbox, echoedInChat])
   // `next-step` mixes human steering with injected context (host notices,
   // third-party block opinions); only the human rows belong in the yellow band.
-  const steering = useMemo(() => (inbox?.['next-step'] ?? []).filter(isHumanSteer).map(row => ({ ...row, text: textOf(row.content) ?? row.text ?? null })), [inbox])
+  const steering = useMemo(() => (inbox?.['next-step'] ?? []).filter(row => isHumanSteer(row) && !isEchoedInChat(row, echoedInChat)).map(row => ({ ...row, text: textOf(row.content) ?? row.text ?? null })), [inbox, echoedInChat])
   const running = useSession(s => s.running)
   // Parity with the official dock: a continuable subagent context still owns
   // a mutable queue; requiring strict null kept the whole action row hidden

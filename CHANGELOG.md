@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.7.19 (2026-11-24)
+
+### 修复：撤回后重发的消息同时出现在正文区与队列条（issue #9）
+
+报告人给了一条完整的复现路径：发 `111` → 执行中发 `222` 入队 → 撤回 `111` → 重发 `111`，结果对话正文区有一张 `111` 的消息卡片，底部队列条同时显示「排队 111」。同一条消息在两处状态矛盾，用户无法判断它到底发出去了没有。
+
+**根因**：宿主把一条投稿同时喂给两个渲染器，而两者对这笔账的认定不同。
+
+- 正文区（`ui-chat` 的 `ChatView`）自己画本地提交回声 —— 凡是 `placement !== 'queued'` 的回声它都画；
+- 本插件的等待区读 `inbox` 投影（`next-turn` / `next-step`）。
+
+在「回声尚未退休、inbox 行已在」的这段窗口里，一条消息就是两个数据源各画一次。官方 `QueueDock.tsx` 早就解过这个问题：它把 `pendingSubmissions` 里 `placement === 'transcript'` 的 `requestId` 收成一个集合，再用行的 `source.rpcId` 去剔重。本插件**从来没读过 `pendingSubmissions`**（grep 全仓 0 命中，`SessionSnapshot` 镜像只裁了 `sessionId`/`running`/`subagent` 三个字段），所以这条交叉校验一直是缺的 —— 不是回声退休逻辑错了，是从没人做过去重的那一半。
+
+**修法**（`steer-queue-dock.tsx`）：
+
+- 新增纯函数 `isEchoedInChat(row, echoed)`：行是 `source.kind === 'user'` 且 `rpcId` 命中集合时返回 true。判断依据与官方 `QueueDock` 逐字同源。
+- 本轮同时覆盖 `next-step`（黄档）：`ChatView` 对 `steering` 回声同样自己画，只修绿档会留下同一个重复的镜像版本。
+- **`queued` 回声刻意不参与匹配**：等待区就是它的家，且宿主是把该行收进 `next-turn` **之后**才退休回声 —— 若把它也算进「正文已画」，绿档会先闪一下再消失。
+- `pendingSubmissions` 在镜像里声明为**可选**：0.1.0 / 0.1.1 线仍由已删除的 `dsh-client-runtime` 提供该快照，本插件无法对它的字段作断言；读取处 `?? NO_ECHOES` 走模块级常量，既不会因缺字段崩溃，也不会让 `useMemo` 每帧重算。0.1.2-rc.1 起的产物已实测带该字段（tarball 取 `contract/snapshot.d.ts` 核验）。
+
+### 已知未修（宿主侧）
+
+若回声已退休、而 `inbox` 里那条行仍滞留，会出现反向的困惑（队列条有人、正文区没有）。那是宿主派发链的问题，与本轮去重无关，插件侧不做猜测性补偿。
+
+### 门禁
+
+typecheck 干净；vitest 9 文件 **108 passed**（新增 5 条：正文回声隐藏绿档行 / 黄档行、`queued` 回声不隐藏、他人回声不误伤、无回声字段的老宿主行照常显示）；lint 零告警；build 通过，产物核验 `lib/client.js` 内 `pendingSubmissions` 命中 2 处。
+
 ## 0.7.18 (2026-11-23)
 
 **兑现「冻结追加」这个从 0.2.10-beta.2 起就写在按钮上的承诺。** 那次提交（`22e8fa8`）把标签改成「冻结追加 / Freeze & append」，commit message 里明写 *Labels only, behaviour unchanged* —— 能力一直没落地。本轮补上，并按用户拍板把口径定为**「冻结入队 / 恢复入队」**（「追加」是 append 的直译，中文不自然）。
