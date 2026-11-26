@@ -10,6 +10,7 @@
  * describe 镜像对该 entry 本就服务——官方 Enter 行就是它的编辑器）。
  */
 import { createElement, useSyncExternalStore, type CSSProperties, type JSX } from 'react'
+import { mountStarRow } from './star-row-copy.ts'
 
 /** 只读快照面（configForms 原生句柄的结构化子集）。 */
 export interface FamilyCardScope {
@@ -53,6 +54,7 @@ export function InputTrafficFamilyCard({ scope, t }: FamilyCardProps): JSX.Eleme
       createElement('span', { style: dim }, `busyEnter = ${pinned}`),
     ),
     createElement('p', { style: { ...dim, margin: 0 } }, tr('family.desc')),
+    createElement('span', { ref: (node: HTMLElement | null) => { if (node && !node.firstChild) node.appendChild(mountStarRow()) } }),
   )
 }
 
